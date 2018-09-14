@@ -1,6 +1,7 @@
 """
 A collection of iterative data analysis pipelines
 """
+import yaml
 
 
 # A wrapper to conveniently modularize analysis tasks
@@ -30,11 +31,24 @@ class Task(object):
 
 
 # Manages a collection of Task objects
-class CalculationFramework(object):
+class TaskEngine(object):
 
-    def __init__(self):
+    def __init__(self, evaluator):
+        assert type(evaluator) == function
+        self.evaluator = evaluator
+
         self._task_lock = False
         self._task_list = []
+
+    @property
+    def configuration(self):
+        try:
+            configuration = yaml.load(open("configuration.yaml"))
+        except FileNotFoundError:
+            # should be custom error
+            raise
+
+        return configuration
 
     def add_task(self, task):
         # modify the workflow with a new task object
@@ -51,7 +65,11 @@ class CalculationFramework(object):
 
         self._task_list.append(task)
 
-    def start(self):
+    def start(self, kwargs):
+        '''
+        :param kwargs: dict of args to pass to the first task in the list
+        :return: kwargs from the last task in the list
+        '''
         # lock the state of the object
         self._task_lock = True
 
@@ -61,44 +79,16 @@ class CalculationFramework(object):
                               reverse=False)
 
         # iterate through the tasks
-        # TODO
+        # pass results on as kwargs
         for t in ordered_list:
-            t.target()
+            kwargs = t.target(**kwargs)
+
+        return kwargs
 
 
-# Controls the operations between each iteration
-# Manages a CalculationFramework or a series of CalculationFrameworks
-class IterativeFramework(object):
+# Iterate over a collection of task objects
+class IterativeTaskEngine(TaskEngine):
 
-    def __init__(self):
-        self._frame_lock = False
-        self._frame_list = []
-
-    def add_framework(self, framework):
-        # modify the iteration queue with a new CalculationFramework
-        assert type(framework) is CalculationFramework
-
-        # make sure framework is accepting new frameworks
-        if self._frame_lock:
-            raise ValueError    # should be custom error
-
-        # make sure the indices do not conflict
-        for f in self._frame_list:
-            if framework.index == f.index:
-                raise ValueError    # should be custom error
-
-        self._frame_list.append(framework)
-
-    def start(self):
-        # lock the state
-        self._frame_lock = True
-
-        # order the frames
-        ordered_list = sorted(self._frame_list,
-                              key=lambda x: x.index,
-                              reverse=False)
-
-        # iterate through frames
-        # TODO
-        for f in ordered_list:
-            f.start()
+    def __init__(self, evaluator):
+        self.evaluator = evaluator
+        super().__init__(self.evaluator)

@@ -3,3 +3,4 @@ pandas
 scipy
 sklearn
 mpi4py
+PyYAML

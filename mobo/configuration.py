@@ -1,13 +1,16 @@
 """
 Configuration object for user defined tweaks to the implementation
 """
+import yaml
 
 
-# this object is what will be accepted by the internals as a configuration
 class BaseConfiguration(dict):
 
     def __init__(self):
         super().__init__()
+
+    def to_yaml(self):
+        yaml.dump(self, open('configuration.yaml', 'w'))
 
 
 class Configuration(object):
@@ -20,15 +23,45 @@ class Configuration(object):
 
         self.custom_config = custom_config
 
-    def _build_configuration(self, custom_configuration):
-        pass
+    @property
+    def default(self):
+        # build a default
+        d = BaseConfiguration()
+        d = default_options(d)
+        # write the yaml file
+        d.to_yaml()
+        return d
 
     @property
     def custom(self):
-        d = BaseConfiguration()
+        # load default
+        d = self.default
+        # add tweaks
+        for key, value in self.custom_config:
+            d[key] = value
+        # write the yaml file
+        d.to_yaml()
         return d
 
-    @property
-    def default(self):
-        d = BaseConfiguration()
-        return d
+
+"""
+===============================
+Very ugly default configuration 
+===============================
+"""
+
+
+def default_options(d):
+    # clustering techniques
+    d['clustering'] = {}
+    d['clustering']['dbscan'] = {}
+    d['clustering']['dbscan']['args'] = {}
+    # manifold learning techniques
+    d['manifold_learning'] = {}
+    d['manifold_learning']['tsne'] = {}
+    d['manifold_learning']['tsne']['args'] = {}
+    # logging statements
+    d['logging'] = {}
+    d['logging']['do_logging'] = True
+    d['logging']['filename'] = 'mobo.log'
+    return d
