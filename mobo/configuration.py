@@ -64,4 +64,7 @@ def default_options(d):
     d['logging'] = {}
     d['logging']['do_logging'] = True
     d['logging']['filename'] = 'mobo.log'
+    # mpi options
+    d['mpi'] = {}
+    d['mpi']['use_mpi'] = True
     return d

@@ -8,6 +8,11 @@ import yaml
 class Task(object):
 
     def __init__(self, parallel, index, target):
+        '''
+        :param parallel: (bool) set parallel processing preference
+        :param index: (int) position in which the task will run relative to others in the same TaskEngine
+        :param target: (function) the function to call as a task
+        '''
         assert type(parallel) is bool
         self._parallel = parallel
 
@@ -34,11 +39,19 @@ class Task(object):
 class TaskEngine(object):
 
     def __init__(self, evaluator):
+        '''
+        :param evaluator: (function) an evaluation function used to get errors
+        '''
         assert type(evaluator) == function
         self.evaluator = evaluator
 
         self._task_lock = False
         self._task_list = []
+
+        self.mpi_comm = None
+        self.mpi_rank = None
+        self.mpi_size = None
+        self.mpi_procname = None
 
     @property
     def configuration(self):
@@ -78,17 +91,64 @@ class TaskEngine(object):
                               key=lambda x: x.index,
                               reverse=False)
 
+        # mpi setup
+        if self.configuration['mpi']['use_mpi']:
+            self._setup_mpi()
+
         # iterate through the tasks
-        # pass results on as kwargs
+        # pass results forward as kwargs
         for t in ordered_list:
-            kwargs = t.target(**kwargs)
+            # check for parallelization
+            if t.parallel:
+                if self.configuration['mpi']['use_mpi']:
+                    # mpi will automatically do it in parallel
+                    kwargs = t.target(**kwargs)
+                else:
+                    # do some other parallel method
+                    raise NotImplementedError("mpi is currently the only supported parallel processing library")
+            else:
+                if self.configuration['mpi']['use_mpi']:
+                    # use just one mpi rank
+                    kwargs = self.use_single_rank(task=t, kwargs=kwargs)
+                    self.mpi_comm.WORLD_BARRIER()
+                else:
+                    # standard single core processing
+                    kwargs = t.target(**kwargs)
 
         return kwargs
+
+    def use_single_rank(self, task, kwargs):
+        '''
+        :param task: The Task object to be run on a single MPI rank
+        :param kwargs: the kwargs from the prior task
+        :return kwargs: the kwargs passed by the target
+        '''
+        # always run solo tasks on rank 0
+        if self.mpi_rank == 0:
+            kwargs = task.target(**kwargs)
+            return kwargs
+
+    def _setup_mpi(self):
+        from mpi4py import MPI
+        self.mpi_comm = MPI.COMM_WORLD
+        self.mpi_rank = self.mpi_comm.Get_rank()
+        self.mpi_size = self.mpi_comm.Get_size()
+        self.mpi_procname = MPI.Get_processor_name()
 
 
 # Iterate over a collection of task objects
 class IterativeTaskEngine(TaskEngine):
 
-    def __init__(self, evaluator):
+    def __init__(self, evaluator, n_iterations):
+        '''
+        :param evaluator: (function) an evaluation function used to get errors
+        '''
         self.evaluator = evaluator
+        self.n_iterations = n_iterations
         super().__init__(self.evaluator)
+
+    def start(self, kwargs):
+        for n in self.n_iterations:
+            kwargs = super().start(**kwargs)
+
+        return kwargs
