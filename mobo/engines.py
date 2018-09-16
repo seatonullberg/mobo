@@ -6,6 +6,14 @@ from queue import Queue
 from threading import Thread
 
 
+# convenient object to fake a two way queue
+class DoubleQueue(object):
+
+    def __init__(self):
+        self.client_queue = Queue()
+        self.server_queue = Queue()
+
+
 # A wrapper to conveniently modularize analysis tasks
 class Task(object):
 
@@ -32,18 +40,15 @@ class Task(object):
         else:
             raise TypeError("name must be a string")
 
-        # key to use as a flag for getting info from the engine
-        self.key = None
-        self.queue = Queue()
+        # use to retrieve info from engine
+        self.queue = DoubleQueue()
 
     def get_from_engine(self, key):
         assert type(key) == str
-        self.key = key
-        # wait for engine to process request
-        while self.queue.empty():
+        self.queue.client_queue.put(key)
+        while self.queue.server_queue.empty():
             continue
-        self.key = None
-        return self.queue.get()
+        return self.queue.server_queue.get()
 
     @property
     def parallel(self):
@@ -74,6 +79,7 @@ class TaskEngine(object):
 
         self._task_lock = False
         self._task_list = []
+        self._queue_list = []
         self.task_map = {}  # k=task.name v=task() return value if it has run yet or None
 
         self.mpi_comm = None
@@ -116,6 +122,8 @@ class TaskEngine(object):
 
         # add to the task_map
         self.task_map[task.name] = None # TODO: instead of none put in an empty result error
+        # add to queue list
+        self._queue_list.append(task.queue)
 
         self._task_list.append(task)
 
@@ -185,10 +193,13 @@ class TaskEngine(object):
 
     def _manage_tasks(self):
         while True:
-            for t in self._task_list:
-                if type(t.key) == str:
-                    data = self.task_map[t.key]
-                    t.queue.put(data)
+            for q in self._queue_list:
+                if not q.client_queue.empty():
+                    # pull key from the client and pass data via server
+                    key = q.client_queue.get()
+                    assert type(key) == str
+                    data = self.task_map[key]
+                    q.server_queue.put(data)
 
 
 # Iterate over a collection of task objects
