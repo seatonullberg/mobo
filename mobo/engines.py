@@ -66,6 +66,16 @@ class Task(object):
     def name(self):
         return self._name
 
+    @property
+    def configuration(self):
+        try:
+            configuration = yaml.load(open("configuration.yaml"))
+        except FileNotFoundError:
+            # should be custom error
+            raise
+
+        return configuration
+
 
 # Manages a collection of Task objects
 class TaskEngine(object):
