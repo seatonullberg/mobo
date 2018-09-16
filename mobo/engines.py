@@ -2,16 +2,19 @@
 A collection of iterative data analysis pipelines
 """
 import yaml
+from queue import Queue
+from threading import Thread
 
 
 # A wrapper to conveniently modularize analysis tasks
 class Task(object):
 
-    def __init__(self, parallel, index, target):
+    def __init__(self, parallel, index, target, name=None):
         '''
         :param parallel: (bool) set parallel processing preference
         :param index: (int) position in which the task will run relative to others in the same TaskEngine
         :param target: (function) the function to call as a task
+        :param name: (str) a user provided name for the task or the name of the target function
         '''
         assert type(parallel) is bool
         self._parallel = parallel
@@ -21,6 +24,26 @@ class Task(object):
 
         assert type(target) is function
         self._target = target
+
+        if name is None:
+            self._name = target.__name__
+        elif type(name) is str:
+            self._name = name
+        else:
+            raise TypeError("name must be a string")
+
+        # key to use as a flag for getting info from the engine
+        self.key = None
+        self.queue = Queue()
+
+    def get_from_engine(self, key):
+        assert type(key) == str
+        self.key = key
+        # wait for engine to process request
+        while self.queue.empty():
+            continue
+        self.key = None
+        return self.queue.get()
 
     @property
     def parallel(self):
@@ -33,6 +56,10 @@ class Task(object):
     @property
     def target(self):
         return self._target
+
+    @property
+    def name(self):
+        return self._name
 
 
 # Manages a collection of Task objects
@@ -47,6 +74,7 @@ class TaskEngine(object):
 
         self._task_lock = False
         self._task_list = []
+        self.task_map = {}  # k=task.name v=task() return value if it has run yet or None
 
         self.mpi_comm = None
         self.mpi_rank = None
@@ -63,6 +91,16 @@ class TaskEngine(object):
 
         return configuration
 
+    def init_from_list(self, evaluator, task_list):
+        '''
+        initialize the object with an ordered list of Task objects
+        :param evaluator: the evaluation function to be passed through
+        :param task_list: ordered list of Task objects
+        '''
+        self.__init__(evaluator)
+        for t in task_list:
+            self.add_task(t)
+
     def add_task(self, task):
         # modify the workflow with a new task object
         assert type(task) is Task   # should be custom error
@@ -75,6 +113,9 @@ class TaskEngine(object):
         for t in self._task_list:
             if task.index == t.index:
                 raise ValueError    # should be a custom error
+
+        # add to the task_map
+        self.task_map[task.name] = None # TODO: instead of none put in an empty result error
 
         self._task_list.append(task)
 
@@ -94,6 +135,10 @@ class TaskEngine(object):
         # mpi setup
         if self.configuration['mpi']['use_mpi']:
             self._setup_mpi()
+
+        # monitor tasks for requested information
+        thread = Thread(target=self._manage_tasks)
+        thread.start()
 
         # iterate through the tasks
         # pass results forward as kwargs
@@ -115,6 +160,9 @@ class TaskEngine(object):
                     # standard single core processing
                     kwargs = t.target(**kwargs)
 
+            # add the return value to task map
+            self.task_map[t.name] = kwargs
+
         return kwargs
 
     def use_single_rank(self, task, kwargs):
@@ -134,6 +182,13 @@ class TaskEngine(object):
         self.mpi_rank = self.mpi_comm.Get_rank()
         self.mpi_size = self.mpi_comm.Get_size()
         self.mpi_procname = MPI.Get_processor_name()
+
+    def _manage_tasks(self):
+        while True:
+            for t in self._task_list:
+                if type(t.key) == str:
+                    data = self.task_map[t.key]
+                    t.queue.put(data)
 
 
 # Iterate over a collection of task objects
