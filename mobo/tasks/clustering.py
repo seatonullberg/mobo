@@ -4,21 +4,19 @@ from mobo.clustering import moboDBSCAN
 
 class ClusterTaskDBSCAN(Task):
 
-    def __init__(self, index):
+    def __init__(self, index, data_key=None, args=None):
         super().__init__(parallel=False,
                          index=index,
-                         target=self.cluster)
+                         target=self.cluster,
+                         data_key=data_key,
+                         args=args)
 
-    def cluster(self, data=None, data_key='tsne_columns'):
-        '''
+    def cluster(self, data):
+        """
         :param data: array-like object
-        :param data_key: str to retrieve data from persistent database
-        '''
-        if data is None:
-            data = self.get_persistent(data_key)
-
+        """
         dbscan = moboDBSCAN(config=self.configuration)
         labels = dbscan.fit_predict(data)
 
-        self.set_persistent(key='dbscan_column',
+        self.set_persistent(key='dbscan_labels',
                             value=labels)

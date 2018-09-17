@@ -4,21 +4,18 @@ from mobo.manifold_learning import moboTSNE
 
 class ManifoldTaskTSNE(Task):
 
-    def __init__(self, index):
+    def __init__(self, index, data_key=None, args=None):
         super().__init__(parallel=False,
                          index=index,
-                         target=self.learn_manifold)
+                         target=self.learn_manifold,
+                         data_key=data_key,
+                         args=args)
 
-    def learn_manifold(self, data=None, data_key='normalized_data'):
-        '''
-        :param data: array-like object
-        :param data_key: str used to retrieve data from persistent database dict
-        '''
-        if data is None:
-            data = self.get_persistent(data_key)
-
+    def learn_manifold(self, normalized_data):
+        """
+        :param normalized_data: array-like object that has hopefully been normalized
+        """
         tsne = moboTSNE(config=self.configuration)
-        tsne_cols = tsne.fit_transform(data)
-
+        tsne_cols = tsne.fit_transform(normalized_data)
         self.set_persistent(key='tsne_columns',
                             value=tsne_cols)

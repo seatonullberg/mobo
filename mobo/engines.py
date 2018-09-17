@@ -17,13 +17,13 @@ class DoubleQueue(object):
 # A wrapper to conveniently modularize analysis tasks
 class Task(object):
 
-    def __init__(self, parallel, index, target, name=None):
-        '''
+    def __init__(self, parallel, index, target, data_key=None, args=None):
+        """
         :param parallel: (bool) set parallel processing preference
         :param index: (int) position in which the task will run relative to others in the same TaskEngine
         :param target: (function) the function to call as a task
-        :param name: (str) a user provided name for the task or the name of the target function
-        '''
+        :param data_key (str) key used to retrieve data from persistent DB in TaskEngine
+        """
         assert type(parallel) is bool
         self._parallel = parallel
 
@@ -33,15 +33,18 @@ class Task(object):
         assert type(target) is function
         self._target = target
 
-        if name is None:
-            self._name = target.__name__
-        elif type(name) is str:
-            self._name = name
+        if data_key is None:
+            self.args = args
         else:
-            raise TypeError("name must be a string")
+            self.args = self.get_persistent(data_key)
 
         # use to retrieve info from engine
         self.queue = DoubleQueue()
+
+    def start(self):
+        # call target with kwargs from init
+        args = self.args
+        return self.target(*args)
 
     def get_persistent(self, key):
         assert type(key) == str
@@ -66,10 +69,6 @@ class Task(object):
     @property
     def target(self):
         return self._target
-
-    @property
-    def name(self):
-        return self._name
 
     @property
     def configuration(self):
@@ -113,11 +112,11 @@ class TaskEngine(object):
         return configuration
 
     def init_from_list(self, evaluator, task_list):
-        '''
+        """
         initialize the object with an ordered list of Task objects
         :param evaluator: the evaluation function to be passed through
         :param task_list: ordered list of Task objects
-        '''
+        """
         self.__init__(evaluator)
         for t in task_list:
             self.add_task(t)
@@ -140,11 +139,7 @@ class TaskEngine(object):
 
         self._task_list.append(task)
 
-    def start(self, kwargs):
-        '''
-        :param kwargs: dict of args to pass to the first task in the list
-        :return: kwargs from the last task in the list
-        '''
+    def start(self):
         # lock the state of the object
         self._task_lock = True
 
@@ -168,31 +163,28 @@ class TaskEngine(object):
             if t.parallel:
                 if self.configuration['mpi']['use_mpi']:
                     # mpi will automatically do it in parallel
-                    kwargs = t.target(**kwargs)
+                    t.start()
                 else:
                     # do some other parallel method
                     raise NotImplementedError("mpi is currently the only supported parallel processing library")
             else:
                 if self.configuration['mpi']['use_mpi']:
                     # use just one mpi rank
-                    kwargs = self.use_single_rank(task=t, kwargs=kwargs)
+                    self.use_single_rank(task=t)
                     self.mpi_comm.WORLD_BARRIER()
                 else:
                     # standard single core processing
-                    kwargs = t.target(**kwargs)
+                    t.start()
 
-        return kwargs
-
-    def use_single_rank(self, task, kwargs):
-        '''
+    def use_single_rank(self, task):
+        """
         :param task: The Task object to be run on a single MPI rank
         :param kwargs: the kwargs from the prior task
         :return kwargs: the kwargs passed by the target
-        '''
+        """
         # always run solo tasks on rank 0
         if self.mpi_rank == 0:
-            kwargs = task.target(**kwargs)
-            return kwargs
+            task.start()
 
     def _setup_mpi(self):
         from mpi4py import MPI
@@ -219,15 +211,13 @@ class TaskEngine(object):
 class IterativeTaskEngine(TaskEngine):
 
     def __init__(self, evaluator, n_iterations):
-        '''
+        """
         :param evaluator: (function) an evaluation function used to get errors
-        '''
+        """
         self.evaluator = evaluator
         self.n_iterations = n_iterations
         super().__init__(self.evaluator)
 
-    def start(self, kwargs):
+    def start(self):
         for n in self.n_iterations:
-            kwargs = super().start(**kwargs)
-
-        return kwargs
+            super().start()
