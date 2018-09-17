@@ -43,12 +43,17 @@ class Task(object):
         # use to retrieve info from engine
         self.queue = DoubleQueue()
 
-    def get_from_engine(self, key):
+    def get_persistent(self, key):
         assert type(key) == str
         self.queue.client_queue.put(key)
         while self.queue.server_queue.empty():
             continue
         return self.queue.server_queue.get()
+
+    def set_persistent(self, key, value):
+        assert type(key) == str
+        self.queue.client_queue.put((key, value))
+        # the rest is handled in the engine
 
     @property
     def parallel(self):
@@ -90,7 +95,7 @@ class TaskEngine(object):
         self._task_lock = False
         self._task_list = []
         self._queue_list = []
-        self.task_map = {}  # k=task.name v=task() return value if it has run yet or None
+        self.database = {}  # used for data persistence
 
         self.mpi_comm = None
         self.mpi_rank = None
@@ -130,8 +135,6 @@ class TaskEngine(object):
             if task.index == t.index:
                 raise ValueError    # should be a custom error
 
-        # add to the task_map
-        self.task_map[task.name] = None # TODO: instead of none put in an empty result error
         # add to queue list
         self._queue_list.append(task.queue)
 
@@ -178,9 +181,6 @@ class TaskEngine(object):
                     # standard single core processing
                     kwargs = t.target(**kwargs)
 
-            # add the return value to task map
-            self.task_map[t.name] = kwargs
-
         return kwargs
 
     def use_single_rank(self, task, kwargs):
@@ -205,11 +205,14 @@ class TaskEngine(object):
         while True:
             for q in self._queue_list:
                 if not q.client_queue.empty():
-                    # pull key from the client and pass data via server
-                    key = q.client_queue.get()
-                    assert type(key) == str
-                    data = self.task_map[key]
-                    q.server_queue.put(data)
+                    data = q.client_queue.get()
+                    if type(data) == str:   # the task is requesting a value with a key
+                        response = self.database[data]
+                        q.server_queue.put(response)
+                    elif type(data) == tuple:   # the task is adding data to the database dict
+                        key = data[0]
+                        value = data[1]
+                        self.database[key] = value
 
 
 # Iterate over a collection of task objects

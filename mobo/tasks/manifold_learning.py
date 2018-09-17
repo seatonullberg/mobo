@@ -9,11 +9,16 @@ class ManifoldTaskTSNE(Task):
                          index=index,
                          target=self.learn_manifold)
 
-    def learn_manifold(self, df):
+    def learn_manifold(self, data=None, data_key='normalized_data'):
         '''
-        :param df: pandas.DataFrame object
-        :return: tSNE dimensions of the df
+        :param data: array-like object
+        :param data_key: str used to retrieve data from persistent database dict
         '''
+        if data is None:
+            data = self.get_persistent(data_key)
+
         tsne = moboTSNE(config=self.configuration)
-        tsne_dims = tsne.fit_transform(df)
-        return tsne_dims
+        tsne_cols = tsne.fit_transform(data)
+
+        self.set_persistent(key='tsne_columns',
+                            value=tsne_cols)

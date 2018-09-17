@@ -9,11 +9,16 @@ class ClusterTaskDBSCAN(Task):
                          index=index,
                          target=self.cluster)
 
-    def cluster(self, df):
+    def cluster(self, data=None, data_key='tsne_columns'):
         '''
-        :param df: pandas.DataFrame object
-        :return: cluster id labels for each sample
+        :param data: array-like object
+        :param data_key: str to retrieve data from persistent database
         '''
+        if data is None:
+            data = self.get_persistent(data_key)
+
         dbscan = moboDBSCAN(config=self.configuration)
-        labels = dbscan.fit_predict(df)
-        return labels
+        labels = dbscan.fit_predict(data)
+
+        self.set_persistent(key='dbscan_column',
+                            value=labels)

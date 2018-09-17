@@ -9,11 +9,16 @@ class StandardNormalizationTask(Task):
                          index=index,
                          target=self.normalize)
 
-    def normalize(self, df):
+    def normalize(self, data=None, data_key='data'):
         '''
-        :param df: pandas.DataFrame object
-        :return: normalized form (mean=0, variance=1) of the df
+        :param data: an array like object
+        :param data_key: str used to retrieve data by a keyword
+                         from the persistent database in TaskEngine
         '''
         scaler = StandardScaler()
-        df = scaler.fit_transform(df)
-        return df
+        if data is None:
+            data = self.get_persistent(data_key)
+        norm_data = scaler.fit_transform(data)
+        # store an array of normalized data
+        self.set_persistent(key='normalized_data',
+                            value=norm_data)

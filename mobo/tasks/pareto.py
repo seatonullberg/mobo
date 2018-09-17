@@ -1,8 +1,6 @@
 from mobo.engines import Task
 from mobo.pareto import calculate_pareto
 
-import pandas as pd
-
 
 class FilterParetoTask(Task):
 
@@ -11,15 +9,16 @@ class FilterParetoTask(Task):
                          index=index,
                          target=self.filter)
 
-    def filter(self, df):
+    def filter(self, data=None, data_key='sample_data'):
         '''
-        :param df: pandas.DataFrame object
-        :return: new DataFrame consisting of only non-dominated points
+        :param data: array-like object
+        :param data_key: str used to retrieve data from database
         '''
-        # convert df to array from efficient calcs
-        arr = df.as_matrix()
-        mask = calculate_pareto(arr)
-        arr = arr[mask]
-        filtered_df = pd.DataFrame(data=arr,
-                                   columns=list(df))
-        return filtered_df
+        if data is None:
+            data = self.get_persistent(data_key)
+
+        mask = calculate_pareto(data)
+        data = data[mask]
+
+        self.set_persistent(key='pareto_data',
+                            value=data)

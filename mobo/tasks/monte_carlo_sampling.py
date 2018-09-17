@@ -9,5 +9,5 @@ class MonteCarloTask(Task):
                          target=self.sample)
 
     # TODO
-    def sample(self, df):
+    def sample(self, data=None, data_key='kde_data'):
         pass
