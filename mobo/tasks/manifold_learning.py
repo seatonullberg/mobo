@@ -15,7 +15,7 @@ class ManifoldTaskTSNE(Task):
         """
         :param normalized_data: array-like object that has hopefully been normalized
         """
-        tsne = moboTSNE(config=self.configuration)
+        tsne = moboTSNE()
         tsne_cols = tsne.fit_transform(normalized_data)
         self.set_persistent(key='tsne_columns',
                             value=tsne_cols)

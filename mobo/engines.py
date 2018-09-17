@@ -1,6 +1,8 @@
 """
 A collection of iterative data analysis pipelines
 """
+from mobo.logging import LogFile
+
 import yaml
 from queue import Queue
 from threading import Thread
@@ -24,27 +26,28 @@ class Task(object):
         :param target: (function) the function to call as a task
         :param data_key (str) key used to retrieve data from persistent DB in TaskEngine
         """
-        assert type(parallel) is bool
+        assert type(parallel) == bool
         self._parallel = parallel
 
-        assert type(index) is int
+        assert type(index) == int
         self._index = index
 
-        assert type(target) is function
+        assert callable(target)
         self._target = target
 
-        if data_key is None:
-            self.args = args
-        else:
-            self.args = self.get_persistent(data_key)
+        # process optional args
+        self.data_key = data_key
+        self.args = args
 
         # use to retrieve info from engine
         self.queue = DoubleQueue()
 
     def start(self):
-        # call target with kwargs from init
-        args = self.args
-        return self.target(*args)
+        if self.data_key is None:
+            args = self.args
+        else:
+            args = self.get_persistent(self.data_key)
+        self.target(args)
 
     def get_persistent(self, key):
         assert type(key) == str
@@ -88,18 +91,25 @@ class TaskEngine(object):
         '''
         :param evaluator: (function) an evaluation function used to get errors
         '''
-        assert type(evaluator) == function
+        assert callable(evaluator)
         self.evaluator = evaluator
 
         self._task_lock = False
         self._task_list = []
         self._queue_list = []
         self.database = {}  # used for data persistence
+        self.is_complete = False
 
         self.mpi_comm = None
         self.mpi_rank = None
         self.mpi_size = None
         self.mpi_procname = None
+
+        self.logger = LogFile()
+
+        # monitor tasks for requested information
+        thread = Thread(target=self._manage_tasks)
+        thread.start()
 
     @property
     def configuration(self):
@@ -123,7 +133,7 @@ class TaskEngine(object):
 
     def add_task(self, task):
         # modify the workflow with a new task object
-        assert type(task) is Task   # should be custom error
+        assert isinstance(task, Task)  # should be custom error
 
         # make sure the object can accept new tasks
         if self._task_lock:
@@ -136,10 +146,15 @@ class TaskEngine(object):
 
         # add to queue list
         self._queue_list.append(task.queue)
-
+        # add to task list
         self._task_list.append(task)
+        # log event
+        self.logger.write("Added {} to TaskEngine".format(type(task).__name__))
 
     def start(self):
+        # log event
+        self.logger.write("Starting the TaskEngine")
+
         # lock the state of the object
         self._task_lock = True
 
@@ -152,13 +167,10 @@ class TaskEngine(object):
         if self.configuration['mpi']['use_mpi']:
             self._setup_mpi()
 
-        # monitor tasks for requested information
-        thread = Thread(target=self._manage_tasks)
-        thread.start()
-
         # iterate through the tasks
         # pass results forward as kwargs
         for t in ordered_list:
+            self.logger.write("Starting Task: {}".format(type(t).__name__))
             # check for parallelization
             if t.parallel:
                 if self.configuration['mpi']['use_mpi']:
@@ -175,18 +187,21 @@ class TaskEngine(object):
                 else:
                     # standard single core processing
                     t.start()
+            self.logger.write("Completed Task: {}".format(type(t).__name__))
+        self.is_complete = True
 
     def use_single_rank(self, task):
         """
         :param task: The Task object to be run on a single MPI rank
-        :param kwargs: the kwargs from the prior task
-        :return kwargs: the kwargs passed by the target
         """
         # always run solo tasks on rank 0
         if self.mpi_rank == 0:
             task.start()
 
     def _setup_mpi(self):
+        # log event
+        self.logger.write("Setting up MPI environment")
+
         from mpi4py import MPI
         self.mpi_comm = MPI.COMM_WORLD
         self.mpi_rank = self.mpi_comm.Get_rank()
@@ -194,17 +209,22 @@ class TaskEngine(object):
         self.mpi_procname = MPI.Get_processor_name()
 
     def _manage_tasks(self):
-        while True:
+        # log event
+        self.logger.write("Starting the task manager")
+
+        while not self.is_complete:
             for q in self._queue_list:
                 if not q.client_queue.empty():
                     data = q.client_queue.get()
                     if type(data) == str:   # the task is requesting a value with a key
                         response = self.database[data]
                         q.server_queue.put(response)
+                        self.logger.write("task manager returned: {}".format(data))
                     elif type(data) == tuple:   # the task is adding data to the database dict
                         key = data[0]
                         value = data[1]
                         self.database[key] = value
+                        self.logger.write("task manager stored: {}".format(key))
 
 
 # Iterate over a collection of task objects

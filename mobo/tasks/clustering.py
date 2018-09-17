@@ -15,8 +15,7 @@ class ClusterTaskDBSCAN(Task):
         """
         :param data: array-like object
         """
-        dbscan = moboDBSCAN(config=self.configuration)
+        dbscan = moboDBSCAN()
         labels = dbscan.fit_predict(data)
-
         self.set_persistent(key='dbscan_labels',
                             value=labels)

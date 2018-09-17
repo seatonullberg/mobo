@@ -3,12 +3,13 @@ Customized implementations of clustering techniques
 """
 
 from sklearn.cluster import DBSCAN
+import yaml
 
 
 class moboDBSCAN(DBSCAN):
 
-    def __init__(self, config):
-        d = config['clustering']['dbscan']['args']
+    def __init__(self):
+        d = self.configuration['clustering']['dbscan']['args']
         kwargs = {}
 
         # process dbscan arguments
@@ -25,3 +26,13 @@ class moboDBSCAN(DBSCAN):
     # TODO
     def _calculate_eps(self):
         return 0.5
+
+    @property
+    def configuration(self):
+        try:
+            configuration = yaml.load(open("configuration.yaml"))
+        except FileNotFoundError:
+            # should be custom error
+            raise
+
+        return configuration

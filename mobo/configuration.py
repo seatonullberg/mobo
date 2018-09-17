@@ -16,7 +16,7 @@ class BaseConfiguration(dict):
 class Configuration(object):
 
     def __init__(self, custom_config=None):
-        if type(custom_config) is None or type(custom_config) == dict:
+        if custom_config is None or type(custom_config) == dict:
             pass
         else:
             raise TypeError("custom_config must be dict or None")
@@ -66,5 +66,5 @@ def default_options(d):
     d['logging']['filename'] = 'mobo.log'
     # mpi options
     d['mpi'] = {}
-    d['mpi']['use_mpi'] = True
+    d['mpi']['use_mpi'] = False
     return d
