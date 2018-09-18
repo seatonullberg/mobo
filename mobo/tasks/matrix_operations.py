@@ -81,3 +81,29 @@ class ConcatenateDataTask(Task):
 
     def _process_pandas(self, a1, a2, axis):
         return pd.concat([a1, a2], axis)
+
+
+class ConcatenateListTask(Task):
+
+    def __init__(self, index, kwargs):
+        super().__init__(parallel=False,
+                         index=index,
+                         target=self.concatenate,
+                         kwargs=kwargs)
+
+    def concatenate(self, data_list, axis):
+        if all(isinstance(d, pd.DataFrame) for d in data_list):
+            result = self._process_pandas(data_list, axis)
+        elif all(isinstance(d, np.ndarray) for d in data_list):
+            result = self._process_numpy(data_list, axis)
+        else:
+            raise TypeError("data_list members must all be same array-like type")
+
+        self.set_persistent(key='concatenated_data',
+                            value=result)
+
+    def _process_numpy(self, data_list, axis):
+        return np.concatenate(data_list, axis)
+
+    def _process_pandas(self, data_list, axis):
+        return pd.concat(data_list, axis)

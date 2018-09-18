@@ -33,7 +33,10 @@ class KDEMonteCarloTask(Task):
         self.set_persistent(key='kde_samples',
                             value=samples)
 
+    # TODO: this is broken
     def _sample(self, data, n_samples, bandwidth):
+        print("_sample: {}".format(data.shape))
         kde = gaussian_kde(data, bandwidth)
         samples = kde.resample(n_samples)
+        print("samples: {}".format(samples.shape))
         return samples

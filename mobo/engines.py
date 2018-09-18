@@ -97,13 +97,7 @@ class Task(object):
 # Manages a collection of Task objects
 class TaskEngine(object):
 
-    def __init__(self, evaluator):
-        '''
-        :param evaluator: (function) an evaluation function used to get errors
-        '''
-        assert callable(evaluator)
-        self.evaluator = evaluator
-
+    def __init__(self):
         self._task_lock = False
         self._task_list = []
         self._queue_list = []
@@ -131,13 +125,12 @@ class TaskEngine(object):
 
         return configuration
 
-    def init_from_list(self, evaluator, task_list):
+    def init_from_list(self, task_list):
         """
         initialize the object with an ordered list of Task objects
-        :param evaluator: the evaluation function to be passed through
         :param task_list: ordered list of Task objects
         """
-        self.__init__(evaluator)
+        self.__init__()
         for t in task_list:
             self.add_task(t)
 
@@ -240,13 +233,12 @@ class TaskEngine(object):
 # Iterate over a collection of task objects
 class IterativeTaskEngine(TaskEngine):
 
-    def __init__(self, evaluator, n_iterations):
+    def __init__(self, n_iterations):
         """
-        :param evaluator: (function) an evaluation function used to get errors
+        :param n_iterations: (int) number of iterations to complete
         """
-        self.evaluator = evaluator
         self.n_iterations = n_iterations
-        super().__init__(self.evaluator)
+        super().__init__()
 
     def start(self):
         for n in self.n_iterations:
