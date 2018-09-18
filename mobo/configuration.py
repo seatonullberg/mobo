@@ -67,4 +67,7 @@ def default_options(d):
     # mpi options
     d['mpi'] = {}
     d['mpi']['use_mpi'] = False
+    # kde options
+    d['kde'] = {}
+    d['kde']['bandwidth_type'] = 'chiu'
     return d

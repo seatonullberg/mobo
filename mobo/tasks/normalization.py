@@ -4,12 +4,11 @@ from sklearn.preprocessing import StandardScaler
 
 class StandardNormalizationTask(Task):
 
-    def __init__(self, index, data_key=None, args=None):
+    def __init__(self, index, kwargs):
         super().__init__(parallel=False,
                          index=index,
                          target=self.normalize,
-                         data_key=data_key,
-                         args=args)
+                         kwargs=kwargs)
 
     def normalize(self, data):
         '''

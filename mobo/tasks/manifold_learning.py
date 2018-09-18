@@ -4,12 +4,11 @@ from mobo.manifold_learning import moboTSNE
 
 class ManifoldTaskTSNE(Task):
 
-    def __init__(self, index, data_key=None, args=None):
+    def __init__(self, index, kwargs):
         super().__init__(parallel=False,
                          index=index,
                          target=self.learn_manifold,
-                         data_key=data_key,
-                         args=args)
+                         kwargs=kwargs)
 
     def learn_manifold(self, normalized_data):
         """

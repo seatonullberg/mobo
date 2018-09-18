@@ -3,12 +3,11 @@ from mobo.engines import Task
 
 class MergeFilesTask(Task):
 
-    def __init__(self, index, data_key=None, args=None):
+    def __init__(self, index, kwargs):
         super().__init__(parallel=False,
                          index=index,
                          target=self.merge_files,
-                         data_key=data_key,
-                         args=args)
+                         kwargs=kwargs)
 
     def merge_files(self):
         pass

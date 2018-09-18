@@ -4,12 +4,11 @@ from mobo.pareto import calculate_pareto
 
 class FilterParetoTask(Task):
 
-    def __init__(self, index, data_key=None, args=None):
+    def __init__(self, index, kwargs):
         super().__init__(parallel=False,
                          index=index,
                          target=self.filter,
-                         data_key=data_key,
-                         args=args)
+                         kwargs=kwargs)
 
     def filter(self, data):
         """

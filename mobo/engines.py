@@ -8,7 +8,7 @@ from queue import Queue
 from threading import Thread
 
 
-# convenient object to fake a two way queue
+# convenience object to fake a two way queue
 class DoubleQueue(object):
 
     def __init__(self):
@@ -16,15 +16,22 @@ class DoubleQueue(object):
         self.server_queue = Queue()
 
 
+# convenience object to distinguish strings from persistent keys
+class moboKey(object):
+
+    def __init__(self, key):
+        self.key = key
+
+
 # A wrapper to conveniently modularize analysis tasks
 class Task(object):
 
-    def __init__(self, parallel, index, target, data_key=None, args=None):
+    def __init__(self, parallel, index, target, kwargs):
         """
         :param parallel: (bool) set parallel processing preference
         :param index: (int) position in which the task will run relative to others in the same TaskEngine
         :param target: (function) the function to call as a task
-        :param data_key (str) key used to retrieve data from persistent DB in TaskEngine
+        :param kwargs: (dict) used to store arguments for target (can contain Key objects to pull from DB)
         """
         assert type(parallel) == bool
         self._parallel = parallel
@@ -35,19 +42,22 @@ class Task(object):
         assert callable(target)
         self._target = target
 
-        # process optional args
-        self.data_key = data_key
-        self.args = args
+        # process kwargs
+        assert type(kwargs) == dict
+        self.kwargs = kwargs
 
         # use to retrieve info from engine
         self.queue = DoubleQueue()
 
     def start(self):
-        if self.data_key is None:
-            args = self.args
-        else:
-            args = self.get_persistent(self.data_key)
-        self.target(args)
+        kwargs = {}
+        for k, v in self.kwargs.items():
+            if isinstance(v, moboKey):
+                value = self.get_persistent(key=v.key)
+                kwargs[k] = value
+            else:
+                kwargs[k] = v
+        self.target(**kwargs)
 
     def get_persistent(self, key):
         assert type(key) == str
