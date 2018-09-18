@@ -2,7 +2,7 @@ from mobo.configuration import Configuration
 from mobo.engines import TaskEngine, moboKey
 from mobo.tasks.normalization import StandardNormalizationTask
 from mobo.tasks.manifold_learning import ManifoldTaskTSNE
-from mobo.tasks.clustering import ClusterTaskDBSCAN
+from mobo.tasks.clustering import ClusterTaskDBSCAN, ClusterTaskKmeans
 from mobo.tasks.matrix_operations import GroupByColumnValue, ConcatenateDataTask
 from mobo.tasks.kde import KDEBandwidthTask
 from mobo.tasks.monte_carlo_sampling import KDEMonteCarloTask
@@ -20,10 +20,7 @@ if __name__ == "__main__":
     config = Configuration()
     config = config.default
 
-    # TODO: fake data is not producing clusters
-    rand_arr = np.random.randn(200, 5)
-    rand_arr_2 = 3 + np.random.randn(200, 5) * 2
-    rand_arr = np.concatenate((rand_arr, rand_arr_2), axis=0)
+    rand_arr = np.random.randn(50, 5)
 
     df = pd.DataFrame(data=rand_arr)
 
@@ -50,7 +47,8 @@ if __name__ == "__main__":
                                  kwargs=d)
 
     d = {'data': moboKey('concatenated_data'),
-         'col_id': -1}
+         'col_id': -1,
+         'drop_selector': True}
     group = GroupByColumnValue(index=4,
                                kwargs=d)
 

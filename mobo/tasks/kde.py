@@ -18,14 +18,14 @@ class KDEBandwidthTask(Task):
 
         if bandwidth_type == 'chiu':
             if type(data) == list:
-                bandwidth = [chiu_h(d) for d in data]
+                bandwidth = [chiu_h(d.T) for d in data]
             else:
-                bandwidth = chiu_h(data)
+                bandwidth = chiu_h(data.T)
         elif bandwidth_type == 'silverman':
             if type(data) == list:
-                bandwidth = [silverman_h(d) for d in data]
+                bandwidth = [silverman_h(d.T) for d in data]
             else:
-                bandwidth = silverman_h(data)
+                bandwidth = silverman_h(data.T)
         else:
             raise ValueError("bandwidth_type must be chiu or silverman")    # custom error
 

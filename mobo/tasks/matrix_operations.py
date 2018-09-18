@@ -12,11 +12,13 @@ class GroupByColumnValue(Task):
                          target=self.subselect,
                          kwargs=kwargs)
 
-    def subselect(self, data, col_id):
+    def subselect(self, data, col_id, drop_selector):
         """
         :param data: an array-like object
         :param col_id: int if array string if DataFrame
                        - indicates which column to group by
+        :param drop_selector: bool indicating whether or not to include the
+                              grouping column in the result
         """
         if isinstance(data, pd.DataFrame):
             assert type(col_id) == str
@@ -24,6 +26,8 @@ class GroupByColumnValue(Task):
             subselections = []
             for v in col_values:
                 sub = data.loc[data[col_id] == v]
+                if drop_selector:
+                    sub = sub.drop(col_id, 1)
                 subselections.append(sub)
         elif isinstance(data, np.ndarray):
             assert type(col_id) == int
@@ -32,6 +36,8 @@ class GroupByColumnValue(Task):
             subselections = []
             for v in col_values:
                 sub = data[np.where(data[:, col_id] == v)]
+                if drop_selector:
+                    sub = np.delete(sub, col_id, 1)
                 subselections.append(sub)
         else:
             raise TypeError("data must be numpy.ndarray or pandas.DataFrame")

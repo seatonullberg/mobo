@@ -56,6 +56,8 @@ def default_options(d):
     d['clustering'] = {}
     d['clustering']['dbscan'] = {}
     d['clustering']['dbscan']['args'] = {}
+    d['clustering']['kmeans'] = {}
+    d['clustering']['kmeans']['args'] = {}
     # manifold learning techniques
     d['manifold_learning'] = {}
     d['manifold_learning']['tsne'] = {}
