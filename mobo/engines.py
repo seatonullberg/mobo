@@ -4,6 +4,7 @@ A collection of iterative data analysis pipelines
 from mobo.logging import LogFile
 
 import yaml
+import time
 from queue import Queue
 from threading import Thread
 
@@ -19,10 +20,8 @@ class DoubleQueue(object):
 # convenience object to distinguish strings from persistent keys
 class moboKey(object):
 
-    def __init__(self, key, index=None, size=None):
+    def __init__(self, key):
         self.key = key
-        self.size = size    # used for forking; indicates the size of an iterable
-        self.index = index  # used for forking; gets a particular index of an iterable
 
 
 # A wrapper to conveniently modularize analysis tasks
@@ -51,12 +50,7 @@ class Task(object):
         kwargs = {}
         for k, v in self.kwargs.items():
             if isinstance(v, moboKey):
-                if v.index is None:
-                    value = self.get_persistent(key=v.key)  # return entire object
-                else:
-                    value = self.get_persistent(key=v.key)
-                    print(value)
-                    value = value[v.index]     # return only one index of an iterable
+                value = self.get_persistent(key=v.key)  # return entire object
                 kwargs[k] = value
             else:
                 kwargs[k] = v
@@ -113,7 +107,7 @@ class Pipeline(object):
 
     def __init__(self):
         self.locked = False
-        self._forking = False
+        self.queue = DoubleQueue()
         self._last_fork_size = None
         self._components = []  # ordered list of tasks
 
@@ -124,24 +118,20 @@ class Pipeline(object):
         return self._components
 
     def add_component(self, component):
-        # make sure the pipeline is open to additions
+        assert isinstance(component, Task) or isinstance(component, Fork) or isinstance(component, Join)
         if self.locked:
             raise RuntimeError("The pipeline has already been compiled")
+        else:
+            self._components.append(component)
 
-        # process the component
-        if isinstance(component, Task):
-            if self._forking:
-                self._make_fork(task=component)     # fork the Task without kwargs modification
-            else:
-                self._components.append(component)     # add the Task directly
-        elif isinstance(component, Fork):
-            self._forking = True
-            self._make_fork(task=component.task,
-                            iterators=component.iterators)     # fork the Task and modify kwargs
-        elif isinstance(component, Join):
-            self._forking = False
+    def get_persistent(self, key):
+        assert type(key) == str
+        self.queue.client_queue.put(key)
+        while self.queue.server_queue.empty():
+            continue
+        return self.queue.server_queue.get()
 
-    def _make_fork(self, task, iterators=None):
+    def make_fork(self, task, iterators=None):
         # create all_args ==> [{k0: iter0_0, k1: iter1_0}, {k0: iter0_1, k1: iter1_1},...]
         # number of tasks to produce is len(all_args) OR self._last_fork_size if iterators is None
         if iterators is not None:
@@ -150,15 +140,13 @@ class Pipeline(object):
             end = 0
             while len(all_args) < end or end == 0:
                 d = {}
-                for key in iterators:
-                    if isinstance(iterators[key], moboKey):
-                        v = iterators[key]
-                        v.index = i
-                        end = v.size
-                    else:
-                        v = iterators[key][i]
-                        end = len(v)
-                    d[key] = v
+                for key, value in iterators.items():
+                    if isinstance(value, moboKey):
+                        value = self.get_persistent(value.key)
+
+                    end = len(value)
+                    value = value[i]
+                    d[key] = value
 
                     if len(d) >= len(iterators):
                         i += 1
@@ -173,24 +161,30 @@ class Pipeline(object):
 
         # add len(all_args) tasks to self._components
         i = 0
+        tasks = []
         while i < new_tasks:
             # modify the kwargs of the forked task
             if iterators is not None:
                 task.kwargs.update(all_args[i])
-            self._components.append(task)
+            tasks.append(task)
             i += 1
         self._last_fork_size = new_tasks    # update the latest fork size
+
+        return tasks
 
 
 # Manages a collection of Task objects
 class TaskEngine(object):
 
     def __init__(self):
-        self.pipeline = Pipeline()
         self._task_list = []
         self._queue_list = []
         self.database = {}  # used for data persistence
         self.is_complete = False
+        self._forking = False
+
+        self.pipeline = Pipeline()
+        self._queue_list.append(self.pipeline.queue)
 
         self.mpi_comm = None
         self.mpi_rank = None
@@ -229,32 +223,49 @@ class TaskEngine(object):
         if self.configuration['mpi']['use_mpi']:
             self._setup_mpi()
 
-        # start monitoring the tasks with threads and queues
-        ordered_task_list = self.pipeline.compile
-        for t in ordered_task_list:
-            self._queue_list.append(t.queue)
+        # iterate through the components
+        ordered_component_list = self.pipeline.compile
+        for c in ordered_component_list:
+            if isinstance(c, Fork):
+                self._forking = True
+                time.sleep(0.1)     # TODO: why does this prevent the program from crashing
+                tasks = self.pipeline.make_fork(task=c.task, iterators=c.iterators)   # fork with modified kwargs
+                for t in tasks:
+                    self._start(t)
+            elif isinstance(c, Join):
+                self._forking = False
+            elif isinstance(c, Task):
+                if self._forking:
+                    tasks = self.pipeline.make_fork(task=c)     # fork without modified kwargs
+                    for t in tasks:
+                        self._start(t)
+                else:
+                    self._start(c)  # do not fork
 
-        # iterate through the tasks
-        for t in ordered_task_list:
-            self.logger.write("Starting Task: {}".format(type(t).__name__))
-            # check for parallelization
-            if t.parallel:
-                if self.configuration['mpi']['use_mpi']:
-                    # mpi will automatically do it in parallel
-                    t.start()
-                else:
-                    # do some other parallel method
-                    raise NotImplementedError("mpi is currently the only supported parallel processing library")
-            else:
-                if self.configuration['mpi']['use_mpi']:
-                    # use just one mpi rank
-                    self.use_single_rank(task=t)
-                    self.mpi_comm.WORLD_BARRIER()
-                else:
-                    # standard single core processing
-                    t.start()
-            self.logger.write("Completed Task: {}".format(type(t).__name__))
         self.is_complete = True
+        self.logger.write("TaskEngine complete")
+
+    def _start(self, task):
+        self.logger.write("Starting Task: {}".format(type(task).__name__))
+        # add to queue list
+        self._queue_list.append(task.queue)
+        # check for parallelization
+        if task.parallel:
+            if self.configuration['mpi']['use_mpi']:
+                # mpi will automatically do it in parallel
+                task.start()
+            else:
+                # do some other parallel method
+                raise NotImplementedError("mpi is currently the only supported parallel processing library")
+        else:
+            if self.configuration['mpi']['use_mpi']:
+                # use just one mpi rank
+                self.use_single_rank(task=task)
+                self.mpi_comm.WORLD_BARRIER()
+            else:
+                # standard single core processing
+                task.start()
+        self.logger.write("Completed Task: {}".format(type(task).__name__))
 
     def use_single_rank(self, task):
         """

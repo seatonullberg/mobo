@@ -54,14 +54,14 @@ if __name__ == "__main__":
     engine.add_component(group)
 
     # fork to calculate the bandwidth of each group
-    d = {'data': moboKey('grouped_subselections', size=2)}
+    d = {'data': moboKey('grouped_subselections')}
     bandwidth = KDEBandwidthTask(kwargs={})
     bandwidth_fork = Fork(iterators=d, task=bandwidth)
     engine.add_component(bandwidth_fork)
 
     # remain forked to do kde sampling
-    d = {'data': moboKey('grouped_subselections', size=2),
-         'bandwidth': moboKey('kde_bandwidth', size=2)}
+    d = {'data': moboKey('grouped_subselections'),
+         'bandwidth': moboKey('kde_bandwidth')}
     sample = KDEMonteCarloTask(kwargs={'n_samples': 50})
     sample_fork = Fork(iterators=d, task=sample)
     engine.add_component(sample_fork)
