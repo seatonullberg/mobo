@@ -6,10 +6,12 @@ import numpy as np
 
 class ClusterTaskDBSCAN(Task):
 
-    def __init__(self, index, kwargs):
-        super().__init__(parallel=False,
+    def __init__(self, index, kwargs, parallel=False, target=None):
+        if target is None:
+            target = self.cluster
+        super().__init__(parallel=parallel,
                          index=index,
-                         target=self.cluster,
+                         target=target,
                          kwargs=kwargs)
 
     def cluster(self, data):
@@ -25,10 +27,12 @@ class ClusterTaskDBSCAN(Task):
 
 class ClusterTaskKmeans(Task):
 
-    def __init__(self, index, kwargs):
-        super().__init__(parallel=False,
+    def __init__(self, index, kwargs, parallel=False, target=None):
+        if target is None:
+            target = self.cluster
+        super().__init__(parallel=parallel,
                          index=index,
-                         target=self.cluster,
+                         target=target,
                          kwargs=kwargs)
 
     def cluster(self, data):

@@ -6,17 +6,26 @@ import numpy as np
 
 class RootMeanSquaredErrorTask(Task):
 
-    def __init__(self, index, kwargs):
-        super().__init__(parallel=False,
+    def __init__(self, index, kwargs, parallel=False, target=None):
+        if target is None:
+            target = self.rms_error
+        super().__init__(parallel=parallel,
                          index=index,
-                         target=self.rms_error,
+                         target=target,
                          kwargs=kwargs)
 
     def rms_error(self, actual, experimental):
         """
-        :param actual: array-like object containing the actual values
-        :param experimental: array-like object containing the predicted values
+        :param actual: list of array-like objects containing the actual values
+        :param experimental: list of array-like objects containing the predicted values
         """
-        rmse = np.sqrt(mean_squared_error(y_true=actual, y_pred=experimental))
-        self.set_persistent(key='rms_error',
-                            value=rmse)
+        assert len(actual) == len(experimental)
+        errors = []
+        for a, e in zip(actual, experimental):
+            print(a.shape)
+            print(e.shape)
+            assert a.shape == e.shape
+            rmse = np.sqrt(mean_squared_error(y_true=a, y_pred=e))
+            errors.append(rmse)
+        self.set_persistent(key='rms_errors',
+                            value=errors)

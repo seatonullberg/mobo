@@ -6,10 +6,12 @@ import pandas as pd
 
 class GroupByColumnValue(Task):
 
-    def __init__(self, index, kwargs):
-        super().__init__(parallel=False,
+    def __init__(self, index, kwargs, parallel=False, target=None):
+        if target is None:
+            target = self.subselect
+        super().__init__(parallel=parallel,
                          index=index,
-                         target=self.subselect,
+                         target=target,
                          kwargs=kwargs)
 
     def subselect(self, data, col_id, drop_selector):
@@ -47,12 +49,14 @@ class GroupByColumnValue(Task):
                             value=subselections)
 
 
-class ConcatenateDataTask(Task):
+class ConcatenatePairTask(Task):
 
-    def __init__(self, index, kwargs):
-        super().__init__(parallel=False,
+    def __init__(self, index, kwargs, parallel=False, target=None):
+        if target is None:
+            target = self.concatenate
+        super().__init__(parallel=parallel,
                          index=index,
-                         target=self.concatenate,
+                         target=target,
                          kwargs=kwargs)
 
     def concatenate(self, a1, a2, axis):
@@ -85,10 +89,12 @@ class ConcatenateDataTask(Task):
 
 class ConcatenateListTask(Task):
 
-    def __init__(self, index, kwargs):
-        super().__init__(parallel=False,
+    def __init__(self, index, kwargs, parallel=False, target=None):
+        if target is None:
+            target = self.concatenate
+        super().__init__(parallel=parallel,
                          index=index,
-                         target=self.concatenate,
+                         target=target,
                          kwargs=kwargs)
 
     def concatenate(self, data_list, axis):

@@ -5,10 +5,12 @@ from scipy.stats import gaussian_kde
 
 class KDEMonteCarloTask(Task):
 
-    def __init__(self, index, kwargs):
-        super().__init__(parallel=False,
+    def __init__(self, index, kwargs, parallel=False, target=None):
+        if target is None:
+            target = self.sample
+        super().__init__(parallel=parallel,
                          index=index,
-                         target=self.sample,
+                         target=target,
                          kwargs=kwargs)
 
     def sample(self, data, bandwidth, n_samples):
@@ -20,23 +22,24 @@ class KDEMonteCarloTask(Task):
         if type(data) == list and type(bandwidth) == list:
             samples = []
             for b, d in zip(bandwidth, data):
-                s = self._sample(d, n_samples, b)
-                samples.append(s)
+                for n in range(n_samples):
+                    s = self._sample(d, b)
+                    samples.append(s)
         elif type(data) != list and type(bandwidth) == list:
             raise TypeError("incompatible types for data and bandwidth")
         elif type(data) == list and type(bandwidth) != list:
             raise TypeError("incompatible types for data and bandwidth")
         else:
             # both data and bandwidth are individuals
-            samples = self._sample(data, n_samples, bandwidth)
-
+            samples = []
+            for n in range(n_samples):
+                s = self._sample(data, bandwidth)
+                samples.append(s)
         self.set_persistent(key='kde_samples',
                             value=samples)
 
     # TODO: this is broken
-    def _sample(self, data, n_samples, bandwidth):
-        print("_sample: {}".format(data.shape))
+    def _sample(self, data, bandwidth):
         kde = gaussian_kde(data, bandwidth)
-        samples = kde.resample(n_samples)
-        print("samples: {}".format(samples.shape))
-        return samples
+        sample = kde.resample()
+        return sample

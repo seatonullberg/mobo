@@ -135,6 +135,9 @@ class TaskEngine(object):
             self.add_task(t)
 
     def add_task(self, task):
+        """
+        :param task: a Task object
+        """
         # modify the workflow with a new task object
         assert isinstance(task, Task)  # should be custom error
 
@@ -153,6 +156,14 @@ class TaskEngine(object):
         self._task_list.append(task)
         # log event
         self.logger.write("Added {} to TaskEngine".format(type(task).__name__))
+
+    # TODO: make this work
+    def add_loop(self, target, iter_args):
+        """
+        :param target: a Task or TaskEngine to clone and process the iterables
+        :param iter_args: a dict containing iterables of equal size to be
+                          iterated over and added to the Task's kwargs dict
+        """
 
     def start(self):
         # log event
