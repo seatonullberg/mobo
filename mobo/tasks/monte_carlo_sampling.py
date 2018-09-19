@@ -5,11 +5,10 @@ from scipy.stats import gaussian_kde
 
 class KDEMonteCarloTask(Task):
 
-    def __init__(self, index, kwargs, parallel=False, target=None):
+    def __init__(self, kwargs, parallel=False, target=None):
         if target is None:
             target = self.sample
         super().__init__(parallel=parallel,
-                         index=index,
                          target=target,
                          kwargs=kwargs)
 

@@ -19,25 +19,23 @@ class DoubleQueue(object):
 # convenience object to distinguish strings from persistent keys
 class moboKey(object):
 
-    def __init__(self, key):
+    def __init__(self, key, index=None, size=None):
         self.key = key
+        self.size = size    # used for forking; indicates the size of an iterable
+        self.index = index  # used for forking; gets a particular index of an iterable
 
 
 # A wrapper to conveniently modularize analysis tasks
 class Task(object):
 
-    def __init__(self, parallel, index, target, kwargs):
+    def __init__(self, parallel, target, kwargs):
         """
         :param parallel: (bool) set parallel processing preference
-        :param index: (int) position in which the task will run relative to others in the same TaskEngine
         :param target: (function) the function to call as a task
         :param kwargs: (dict) used to store arguments for target (can contain Key objects to pull from DB)
         """
         assert type(parallel) == bool
         self._parallel = parallel
-
-        assert type(index) == int
-        self._index = index
 
         assert callable(target)
         self._target = target
@@ -53,7 +51,12 @@ class Task(object):
         kwargs = {}
         for k, v in self.kwargs.items():
             if isinstance(v, moboKey):
-                value = self.get_persistent(key=v.key)
+                if v.index is None:
+                    value = self.get_persistent(key=v.key)  # return entire object
+                else:
+                    value = self.get_persistent(key=v.key)
+                    print(value)
+                    value = value[v.index]     # return only one index of an iterable
                 kwargs[k] = value
             else:
                 kwargs[k] = v
@@ -76,10 +79,6 @@ class Task(object):
         return self._parallel
 
     @property
-    def index(self):
-        return self._index
-
-    @property
     def target(self):
         return self._target
 
@@ -94,11 +93,100 @@ class Task(object):
         return configuration
 
 
+# convenience class to signal behavior in Pipeline
+class Fork(object):
+
+    def __init__(self, iterators, task):
+        self.iterators = iterators
+        self.task = task
+
+
+# convenience class to signal behavior in Pipeline
+class Join(object):
+
+    def __init__(self):
+        pass
+
+
+# compile Tasks, Forks, and Joins into a useful task list
+class Pipeline(object):
+
+    def __init__(self):
+        self.locked = False
+        self._forking = False
+        self._last_fork_size = None
+        self._components = []  # ordered list of tasks
+
+    @property
+    def compile(self):
+        # return the final pipeline as a list of Tasks
+        self.locked = True
+        return self._components
+
+    def add_component(self, component):
+        # make sure the pipeline is open to additions
+        if self.locked:
+            raise RuntimeError("The pipeline has already been compiled")
+
+        # process the component
+        if isinstance(component, Task):
+            if self._forking:
+                self._make_fork(task=component)     # fork the Task without kwargs modification
+            else:
+                self._components.append(component)     # add the Task directly
+        elif isinstance(component, Fork):
+            self._forking = True
+            self._make_fork(task=component.task,
+                            iterators=component.iterators)     # fork the Task and modify kwargs
+        elif isinstance(component, Join):
+            self._forking = False
+
+    def _make_fork(self, task, iterators=None):
+        # create all_args ==> [{k0: iter0_0, k1: iter1_0}, {k0: iter0_1, k1: iter1_1},...]
+        # number of tasks to produce is len(all_args) OR self._last_fork_size if iterators is None
+        if iterators is not None:
+            i = 0
+            all_args = []
+            end = 0
+            while len(all_args) < end or end == 0:
+                d = {}
+                for key in iterators:
+                    if isinstance(iterators[key], moboKey):
+                        v = iterators[key]
+                        v.index = i
+                        end = v.size
+                    else:
+                        v = iterators[key][i]
+                        end = len(v)
+                    d[key] = v
+
+                    if len(d) >= len(iterators):
+                        i += 1
+                        all_args.append(d)
+                        d = {}
+
+        # determine number of tasks to make
+        if iterators is None:
+            new_tasks = self._last_fork_size
+        else:
+            new_tasks = len(all_args)
+
+        # add len(all_args) tasks to self._components
+        i = 0
+        while i < new_tasks:
+            # modify the kwargs of the forked task
+            if iterators is not None:
+                task.kwargs.update(all_args[i])
+            self._components.append(task)
+            i += 1
+        self._last_fork_size = new_tasks    # update the latest fork size
+
+
 # Manages a collection of Task objects
 class TaskEngine(object):
 
     def __init__(self):
-        self._task_lock = False
+        self.pipeline = Pipeline()
         self._task_list = []
         self._queue_list = []
         self.database = {}  # used for data persistence
@@ -125,65 +213,29 @@ class TaskEngine(object):
 
         return configuration
 
-    def init_from_list(self, task_list):
+    def add_component(self, component):
         """
-        initialize the object with an ordered list of Task objects
-        :param task_list: ordered list of Task objects
+        :param component: a Task/Fork/Join object
         """
-        self.__init__()
-        for t in task_list:
-            self.add_task(t)
-
-    def add_task(self, task):
-        """
-        :param task: a Task object
-        """
-        # modify the workflow with a new task object
-        assert isinstance(task, Task)  # should be custom error
-
-        # make sure the object can accept new tasks
-        if self._task_lock:
-            raise ValueError    # this should be a custom error
-
-        # make sure the index does not conflict with that of another task
-        for t in self._task_list:
-            if task.index == t.index:
-                raise ValueError    # should be a custom error
-
-        # add to queue list
-        self._queue_list.append(task.queue)
-        # add to task list
-        self._task_list.append(task)
-        # log event
-        self.logger.write("Added {} to TaskEngine".format(type(task).__name__))
-
-    # TODO: make this work
-    def add_loop(self, target, iter_args):
-        """
-        :param target: a Task or TaskEngine to clone and process the iterables
-        :param iter_args: a dict containing iterables of equal size to be
-                          iterated over and added to the Task's kwargs dict
-        """
+        # modify the workflow with a new object
+        assert isinstance(component, Task) or isinstance(component, Fork) or isinstance(component, Join)
+        self.pipeline.add_component(component)
 
     def start(self):
         # log event
         self.logger.write("Starting the TaskEngine")
 
-        # lock the state of the object
-        self._task_lock = True
-
-        # order the tasks
-        ordered_list = sorted(self._task_list,
-                              key=lambda x: x.index,
-                              reverse=False)
-
         # mpi setup
         if self.configuration['mpi']['use_mpi']:
             self._setup_mpi()
 
+        # start monitoring the tasks with threads and queues
+        ordered_task_list = self.pipeline.compile
+        for t in ordered_task_list:
+            self._queue_list.append(t.queue)
+
         # iterate through the tasks
-        # pass results forward as kwargs
-        for t in ordered_list:
+        for t in ordered_task_list:
             self.logger.write("Starting Task: {}".format(type(t).__name__))
             # check for parallelization
             if t.parallel:

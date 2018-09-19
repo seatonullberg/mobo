@@ -1,5 +1,5 @@
 from mobo.configuration import Configuration
-from mobo.engines import TaskEngine, moboKey
+from mobo.engines import TaskEngine, moboKey, Fork, Join
 from mobo.tasks.normalization import StandardNormalizationTask
 from mobo.tasks.manifold_learning import ManifoldTaskTSNE
 from mobo.tasks.clustering import ClusterTaskDBSCAN, ClusterTaskKmeans
@@ -24,53 +24,55 @@ if __name__ == "__main__":
     # load engine
     engine = TaskEngine()
 
-    # init tasks
+    # normalize the data
     d = {'data': df}
-    normalize = StandardNormalizationTask(index=0,
-                                          kwargs=d)
+    normalize = StandardNormalizationTask(kwargs=d)
+    engine.add_component(normalize)
 
+    # learn the tSNE manifold
     d = {'normalized_data': moboKey('normalized_data')}
-    tsne = ManifoldTaskTSNE(index=1,
-                            kwargs=d)
+    tsne = ManifoldTaskTSNE(kwargs=d)
+    engine.add_component(tsne)
 
+    # cluster the data by tSNE dimensions
     d = {'data': moboKey('tsne_columns')}
-    cluster = ClusterTaskKmeans(index=2,
-                                kwargs=d)
+    cluster = ClusterTaskKmeans(kwargs=d)
+    engine.add_component(cluster)
 
+    # concat normal data with cluster labels
     d = {'a1': moboKey('normalized_data'),
          'a2': moboKey('kmeans_labels'),
          'axis': 1}
-    concat = ConcatenatePairTask(index=3,
-                                 kwargs=d)
+    concat = ConcatenatePairTask(kwargs=d)
+    engine.add_component(concat)
 
+    # subselect the concatenated data into groups by cluster id
     d = {'data': moboKey('concatenated_data'),
          'col_id': -1,
          'drop_selector': True}
-    group = GroupByColumnValue(index=4,
-                               kwargs=d)
+    group = GroupByColumnValue(kwargs=d)
+    engine.add_component(group)
 
-    d = {'data': moboKey('grouped_subselections')}
-    bandwidth = KDEBandwidthTask(index=5,
-                                 kwargs=d)
+    # fork to calculate the bandwidth of each group
+    d = {'data': moboKey('grouped_subselections', size=2)}
+    bandwidth = KDEBandwidthTask(kwargs={})
+    bandwidth_fork = Fork(iterators=d, task=bandwidth)
+    engine.add_component(bandwidth_fork)
 
-    d = {'data': moboKey('grouped_subselections'),
-         'bandwidth': moboKey('kde_bandwidth'),
-         'n_samples': 50}
-    sample = KDEMonteCarloTask(index=6,
-                               kwargs=d)
+    # remain forked to do kde sampling
+    d = {'data': moboKey('grouped_subselections', size=2),
+         'bandwidth': moboKey('kde_bandwidth', size=2)}
+    sample = KDEMonteCarloTask(kwargs={'n_samples': 50})
+    sample_fork = Fork(iterators=d, task=sample)
+    engine.add_component(sample_fork)
 
+    '''
+    # to calculate errors
     d = {'actual': rand_arr,
          'experimental': moboKey('kde_samples')}
-    error = RootMeanSquaredErrorTask(index=7,
-                                     kwargs=d)
-
-    # add tasks
-    engine.add_task(normalize)
-    engine.add_task(tsne)
-    engine.add_task(cluster)
-    engine.add_task(concat)
-    engine.add_task(group)
-    engine.add_task(bandwidth)
-    engine.add_task(sample)
-    engine.add_task(error)
+    error = RootMeanSquaredErrorTask(kwargs=d)
+    '''
     engine.start()
+    # TODO: fix persistent data overriding issue
+    # occurs in KDEMonteCarloTask because the bandwidth
+    # gets overwritten which means it is no longer working on an iterable
