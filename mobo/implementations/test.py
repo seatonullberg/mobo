@@ -66,13 +66,8 @@ if __name__ == "__main__":
     sample_fork = Fork(iterators=d, task=sample)
     engine.add_component(sample_fork)
 
-    '''
     # to calculate errors
-    d = {'actual': rand_arr,
-         'experimental': moboKey('kde_samples')}
-    error = RootMeanSquaredErrorTask(kwargs=d)
-    '''
+    error = RootMeanSquaredErrorTask(kwargs={'actual': [rand_arr[50:], rand_arr[:50]]})
+    error_join = Join(task=error, iterators={'experimental': moboKey('kde_samples')})
+    engine.add_component(error_join)
     engine.start()
-    # TODO: fix persistent data overriding issue
-    # occurs in KDEMonteCarloTask because the bandwidth
-    # gets overwritten which means it is no longer working on an iterable

@@ -35,8 +35,9 @@ class Fork(object):
 # Convenience class to signal behavior in Pipeline
 class Join(object):
 
-    def __init__(self):
-        pass
+    def __init__(self, iterators, task):
+        self.iterators = iterators
+        self.task = task
 
 
 # Provide a convenient wrapper to lock access after "compilation"
@@ -169,7 +170,7 @@ class TaskEngine(object):
         self.logger = LogFile()
 
         # provide Tasks access to  self.database through a perpetual monitor thread
-        thread = Thread(target=self._manage_tasks)
+        thread = Thread(target=self._manage_database)
         thread.start()
 
     @property
@@ -203,14 +204,16 @@ class TaskEngine(object):
             if isinstance(c, Fork):
                 self._forking = True
                 time.sleep(0.1)     # TODO: why does this prevent the program from crashing
-                tasks = self._make_fork(task=c.task, iterators=c.iterators)     # fork and modify kwargs
+                tasks = self._fork(task=c.task, iterators=c.iterators)     # fork and modify kwargs
                 for i, t in enumerate(tasks):
                     self._start(task=t, fork_id=i)
             elif isinstance(c, Join):
                 self._forking = False
+                task = self._join(task=c.task, iterators=c.iterators)   # join and modify kwargs if iterators provided
+                self._start(task=task)
             elif isinstance(c, Task):
                 if self._forking:
-                    tasks = self._make_fork(task=c)     # fork without modification of kwargs
+                    tasks = self._fork(task=c)     # fork without modification of kwargs
                     for i, t in enumerate(tasks):
                         self._start(task=t, fork_id=i)
                 else:
@@ -268,7 +271,7 @@ class TaskEngine(object):
         self.mpi_size = self.mpi_comm.Get_size()
         self.mpi_procname = MPI.Get_processor_name()
 
-    def _manage_tasks(self):
+    def _manage_database(self):
         # log event
         self.logger.write("Starting the task manager")
 
@@ -286,7 +289,7 @@ class TaskEngine(object):
                         self.database[key] = value
                         self.logger.write("task manager stored: {}".format(key))
 
-    def _make_fork(self, task, iterators=None):
+    def _fork(self, task, iterators=None):
         """
         :param task: Task object
         :param iterators: (dict) contains string keys and iterator values that will be
@@ -343,6 +346,29 @@ class TaskEngine(object):
         self._last_fork_size = new_tasks    # update the latest fork size
 
         return tasks
+
+    def _join(self, task, iterators=None):
+        """
+        :param task: Task object
+        :param iterators: (dict) contains string keys and iterator values that will be
+                                 joined from prior tasks in fork
+        """
+        joined_dict = {}
+        if iterators is not None:
+            for key, value in iterators.items():
+                # k is the key in the local database
+                # key is the key in the kwargs
+                if isinstance(value, moboKey):
+                    k = value.key
+                else:
+                    k = key
+                joined_dict[key] = []
+                for i, d in self.local_databases.items():
+                    joined_dict[key].append(d[k])
+
+        # modify the kwargs of the task
+        task.kwargs.update(joined_dict)
+        return task
 
 
 # Iterate over a collection of task objects

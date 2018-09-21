@@ -21,8 +21,6 @@ class RootMeanSquaredErrorTask(Task):
         assert len(actual) == len(experimental)
         errors = []
         for a, e in zip(actual, experimental):
-            print(a.shape)
-            print(e.shape)
             assert a.shape == e.shape
             rmse = np.sqrt(mean_squared_error(y_true=a, y_pred=e))
             errors.append(rmse)
