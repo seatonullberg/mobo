@@ -60,9 +60,9 @@ if __name__ == "__main__":
     engine.add_component(bandwidth_fork)
 
     # remain forked to do kde sampling
-    d = {'data': moboKey('grouped_subselections'),
-         'bandwidth': moboKey('kde_bandwidth')}
-    sample = KDEMonteCarloTask(kwargs={'n_samples': 50})
+    d = {'data': moboKey('grouped_subselections')}
+    sample = KDEMonteCarloTask(kwargs={'bandwidth': moboKey('kde_bandwidth'),
+                                       'n_samples': 50})
     sample_fork = Fork(iterators=d, task=sample)
     engine.add_component(sample_fork)
 

@@ -27,6 +27,7 @@ class KDEMonteCarloTask(Task):
         elif type(data) != list and type(bandwidth) == list:
             raise TypeError("incompatible types for data and bandwidth")
         elif type(data) == list and type(bandwidth) != list:
+            print(self.local_database.keys())
             raise TypeError("incompatible types for data and bandwidth")
         else:
             # both data and bandwidth are individuals

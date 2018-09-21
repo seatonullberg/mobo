@@ -84,6 +84,12 @@ class Task(object):
         # use to retrieve data from persistent database in engine
         self.queue = DoubleQueue()
 
+        # use for forking
+        self.local_database = None
+
+        # use for forking
+        self.is_forking = False
+
     def start(self):
         kwargs = {}
         for k, v in self.kwargs.items():
@@ -100,10 +106,14 @@ class Task(object):
         :param key: (str) used to get data from persistent database in engine
         """
         assert type(key) == str
-        self.queue.client_queue.put(key)
-        while self.queue.server_queue.empty():
-            continue
-        return self.queue.server_queue.get()
+
+        if self.is_forking:
+            return self.local_database[key]
+        else:
+            self.queue.client_queue.put(key)
+            while self.queue.server_queue.empty():
+                continue
+            return self.queue.server_queue.get()
 
     def set_persistent(self, key, value):
         """
@@ -111,8 +121,11 @@ class Task(object):
         :param value: any object
         """
         assert type(key) == str
-        self.queue.client_queue.put((key, value))
-        # the rest is handled in the engine
+
+        if self.is_forking:
+            self.local_database[key] = value
+        else:
+            self.queue.client_queue.put((key, value))
 
     @property
     def parallel(self):
@@ -140,6 +153,7 @@ class TaskEngine(object):
         self._task_list = []
         self._queue_list = []
         self.database = {}  # used for data persistence across tasks
+        self.local_databases = None   # used for forking
         self.is_complete = False
         self._forking = False
         self._last_fork_size = None
@@ -190,22 +204,22 @@ class TaskEngine(object):
                 self._forking = True
                 time.sleep(0.1)     # TODO: why does this prevent the program from crashing
                 tasks = self._make_fork(task=c.task, iterators=c.iterators)     # fork and modify kwargs
-                for t in tasks:
-                    self._start(t)
+                for i, t in enumerate(tasks):
+                    self._start(task=t, fork_id=i)
             elif isinstance(c, Join):
                 self._forking = False
             elif isinstance(c, Task):
                 if self._forking:
                     tasks = self._make_fork(task=c)     # fork without modification of kwargs
-                    for t in tasks:
-                        self._start(t)
+                    for i, t in enumerate(tasks):
+                        self._start(task=t, fork_id=i)
                 else:
                     self._start(c)  # do not fork
 
         self.is_complete = True
         self.logger.write("TaskEngine complete")
 
-    def _start(self, task):
+    def _start(self, task, fork_id=None):
         """
         :param task: Task object
         """
@@ -217,26 +231,32 @@ class TaskEngine(object):
             if self.configuration['mpi']['use_mpi']:
                 # mpi will automatically do it in parallel
                 task.start()
+                if fork_id is not None:
+                    self.local_databases[fork_id] = task.local_database
             else:
                 # do some other parallel method
                 raise NotImplementedError("mpi is currently the only supported parallel processing library")
         else:
             if self.configuration['mpi']['use_mpi']:
                 # use just one mpi rank
-                self._use_single_rank(task=task)
+                self._use_single_rank(task=task, fork_id=fork_id)
                 self.mpi_comm.WORLD_BARRIER()
             else:
                 # standard single core processing
                 task.start()
+                if fork_id is not None:
+                    self.local_databases[fork_id] = task.local_database
         self.logger.write("Completed Task: {}".format(type(task).__name__))
 
-    def _use_single_rank(self, task):
+    def _use_single_rank(self, task, fork_id=None):
         """
         :param task: Task object to be run on a single MPI rank
         """
         # always run solo tasks on rank 0
         if self.mpi_rank == 0:
             task.start()
+            if fork_id is not None:
+                self.local_databases[fork_id] = task.local_database
 
     def _setup_mpi(self):
         # log event
@@ -305,12 +325,19 @@ class TaskEngine(object):
             new_tasks = len(all_args)
 
         # add len(all_args) tasks to self._components
+        if self.local_databases is None:
+            self.local_databases = {i: self.database for i in range(new_tasks)}
         i = 0
         tasks = []
         while i < new_tasks:
             # modify the kwargs of the forked task
             if iterators is not None:
                 task.kwargs.update(all_args[i])
+            # indicate forked status
+            task.is_forking = True
+            # set proper local database
+            task.local_database = self.local_databases[i]
+            # store initialized task
             tasks.append(task)
             i += 1
         self._last_fork_size = new_tasks    # update the latest fork size
