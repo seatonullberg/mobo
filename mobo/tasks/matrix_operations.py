@@ -21,6 +21,7 @@ class GroupByColumnValue(Task):
         :param drop_selector: bool indicating whether or not to include the
                               grouping column in the result
         """
+        print("GroupBy: {}".format(data.shape))
         if isinstance(data, pd.DataFrame):
             assert type(col_id) == str
             col_values = set(data[col_id])
@@ -33,7 +34,6 @@ class GroupByColumnValue(Task):
         elif isinstance(data, np.ndarray):
             assert type(col_id) == int
             col_values = set(data[:, col_id])
-            print(col_values)
             subselections = []
             for v in col_values:
                 sub = data[np.where(data[:, col_id] == v)]
@@ -43,7 +43,6 @@ class GroupByColumnValue(Task):
         else:
             raise TypeError("data must be numpy.ndarray or pandas.DataFrame")
             # make it a custom error
-
         self.set_persistent(key='grouped_subselections',
                             value=subselections)
 
@@ -64,6 +63,7 @@ class ConcatenatePairTask(Task):
         :param axis: axis along which to join arrays
         * type(a1) == type(a2)
         """
+        print("Concatenate: {x} {y}".format(x=a1.shape, y=a2.shape))
         if type(a1) == type(a2):
             if type(a1) == np.ndarray:
                 result = self._process_numpy(a1, a2, axis)

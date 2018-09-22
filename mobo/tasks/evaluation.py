@@ -21,8 +21,11 @@ class RootMeanSquaredErrorTask(Task):
         assert len(actual) == len(experimental)
         errors = []
         for a, e in zip(actual, experimental):
+            print("Evaluation: {x} {y}".format(x=a.shape, y=e.shape))
             assert a.shape == e.shape
-            rmse = np.sqrt(mean_squared_error(y_true=a, y_pred=e))
-            errors.append(rmse)
+            for i in range(a.shape[0]):
+                rmse = np.sqrt(mean_squared_error(y_true=a[i], y_pred=e[i]))
+                errors.append(rmse)
+        errors = np.vstack(errors)
         self.set_persistent(key='rms_errors',
                             value=errors)

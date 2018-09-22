@@ -37,6 +37,7 @@ class ClusterTaskKmeans(Task):
         """
         :param data: array-like object
         """
+        print("KMEANS: {}".format(data.shape))
         kmeans = moboKmeans()
         labels = kmeans.fit_predict(data)
         labels = np.resize(labels, (labels.shape[0], 1))

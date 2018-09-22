@@ -13,7 +13,6 @@ def silverman_h(arr):
     :param arr: array
     :return: bandwidth
     '''
-    print(arr.shape)
     kde = stats.gaussian_kde(arr, 'silverman')
     return kde.factor
 
@@ -25,7 +24,6 @@ def chiu_h(arr):
     :param arr: array
     :return: bandwidth
     '''
-    print(arr.shape)
     cb = ChiuBandwidth(arr)
     return cb.bandwidth
 
@@ -51,7 +49,7 @@ class ChiuBandwidth(object):
 
         arr_i = np.delete(self.arr, i)
         kde = stats.gaussian_kde(arr_i, _h)
-        return kde(self.arr[i])
+        return kde.evaluate(self.arr[i])
 
     def J(self, h):
         if type(h) is float:

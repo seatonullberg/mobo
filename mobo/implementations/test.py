@@ -8,7 +8,6 @@ from mobo.tasks.kde import KDEBandwidthTask
 from mobo.tasks.monte_carlo_sampling import KDEMonteCarloTask
 from mobo.tasks.evaluation import RootMeanSquaredErrorTask
 
-import pandas as pd
 import numpy as np
 
 
@@ -19,13 +18,11 @@ if __name__ == "__main__":
 
     rand_arr = np.random.randn(100, 5)
 
-    df = pd.DataFrame(data=rand_arr)
-
     # load engine
     engine = TaskEngine()
 
     # normalize the data
-    d = {'data': df}
+    d = {'data': rand_arr}
     normalize = StandardNormalizationTask(kwargs=d)
     engine.add_component(normalize)
 

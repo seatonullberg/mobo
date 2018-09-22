@@ -15,6 +15,7 @@ class StandardNormalizationTask(Task):
         '''
         :param data: an array like object
         '''
+        print("Normalize: {}".format(data.shape))
         scaler = StandardScaler()
         norm_data = scaler.fit_transform(data)
         # store an array of normalized data

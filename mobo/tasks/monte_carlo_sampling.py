@@ -1,5 +1,6 @@
 from mobo.engines import Task
 
+import numpy as np
 from scipy.stats import gaussian_kde
 
 
@@ -14,32 +15,22 @@ class KDEMonteCarloTask(Task):
 
     def sample(self, data, bandwidth, n_samples):
         """
-        :param data: an array-like object or list of array-like objects
-        :param bandwidth: list of ints or int to estimate KDE bandwidth
+        :param data: an array-like object
+        :param bandwidth: int used to calculate KDE
         :param n_samples: int to indicate how many samples to pull from data
         """
-        if type(data) == list and type(bandwidth) == list:
-            samples = []
-            for b, d in zip(bandwidth, data):
-                for n in range(n_samples):
-                    s = self._sample(d, b)
-                    samples.append(s)
-        elif type(data) != list and type(bandwidth) == list:
-            raise TypeError("incompatible types for data and bandwidth")
-        elif type(data) == list and type(bandwidth) != list:
-            print(self.local_database.keys())
-            raise TypeError("incompatible types for data and bandwidth")
-        else:
-            # both data and bandwidth are individuals
-            samples = []
-            for n in range(n_samples):
-                s = self._sample(data, bandwidth)
-                samples.append(s)
+        print("MonteCarlo: {}".format(data.shape))
+        # both data and bandwidth are individuals
+        samples = []
+        for n in range(n_samples):
+            s = self._sample(data, bandwidth)
+            samples.append(s)
+        samples = np.vstack(samples)
         self.set_persistent(key='kde_samples',
                             value=samples)
 
     # TODO: this is broken
     def _sample(self, data, bandwidth):
-        kde = gaussian_kde(data, bandwidth)
-        sample = kde.resample()
-        return sample
+        kde = gaussian_kde(data.T, bandwidth)
+        sample = kde.resample(1)
+        return sample.T

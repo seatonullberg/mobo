@@ -15,6 +15,7 @@ class KDEBandwidthTask(Task):
         """
         :param data: an array-like object or list of array-like objects
         """
+        print("Bandwidth: {}".format(data.shape))
         bandwidth_type = self.configuration['kde']['bandwidth_type']
 
         if bandwidth_type == 'chiu':
