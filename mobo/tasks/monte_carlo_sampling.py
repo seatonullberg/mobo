@@ -29,7 +29,6 @@ class KDEMonteCarloTask(Task):
         self.set_persistent(key='kde_samples',
                             value=samples)
 
-    # TODO: this is broken
     def _sample(self, data, bandwidth):
         kde = gaussian_kde(data.T, bandwidth)
         sample = kde.resample(1)

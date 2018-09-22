@@ -3,10 +3,11 @@ from mobo.engines import TaskEngine, moboKey, Fork, Join
 from mobo.tasks.normalization import StandardNormalizationTask
 from mobo.tasks.manifold_learning import ManifoldTaskTSNE
 from mobo.tasks.clustering import ClusterTaskDBSCAN, ClusterTaskKmeans
-from mobo.tasks.matrix_operations import GroupByColumnValue, ConcatenatePairTask, ConcatenateListTask
+from mobo.tasks.matrix_operations import GroupByColumnValue, ConcatenatePairTask
 from mobo.tasks.kde import KDEBandwidthTask
 from mobo.tasks.monte_carlo_sampling import KDEMonteCarloTask
 from mobo.tasks.evaluation import RootMeanSquaredErrorTask
+from mobo.tasks.pareto import FilterParetoTask
 
 import numpy as np
 
@@ -67,4 +68,12 @@ if __name__ == "__main__":
     error = RootMeanSquaredErrorTask(kwargs={'actual': [rand_arr[50:], rand_arr[:50]]})
     error_join = Join(task=error, iterators={'experimental': moboKey('kde_samples')})
     engine.add_component(error_join)
+
+    # apply pareto filter to data based on errors
+    d = {'data_to_filter': moboKey('rms_errors'),
+         'data_to_apply': moboKey('normalized_data')}
+    pareto = FilterParetoTask(kwargs=d)
+    engine.add_component(pareto)
+
+    # start the TaskEngine
     engine.start()

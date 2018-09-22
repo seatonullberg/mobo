@@ -1,6 +1,5 @@
 from mobo.engines import Task
 
-from sklearn.metrics import mean_squared_error
 import numpy as np
 
 
@@ -24,8 +23,12 @@ class RootMeanSquaredErrorTask(Task):
             print("Evaluation: {x} {y}".format(x=a.shape, y=e.shape))
             assert a.shape == e.shape
             for i in range(a.shape[0]):
-                rmse = np.sqrt(mean_squared_error(y_true=a[i], y_pred=e[i]))
-                errors.append(rmse)
+                err_row = []
+                for x in range(a.shape[1]):
+                    err = (a[i][x] - e[i][x])**2
+                    err = np.sqrt(err)
+                    err_row.append(err)
+                errors.append(np.hstack(err_row))
         errors = np.vstack(errors)
         self.set_persistent(key='rms_errors',
                             value=errors)
