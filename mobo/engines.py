@@ -44,12 +44,9 @@ class Pipeline(object):
 
     def __init__(self):
         self.locked = False
-        self.queue = DoubleQueue()
-        self._last_fork_size = None
         self._components = []   # ordered list of Task/Fork/Join objects
 
-    @property
-    def compile(self):
+    def compile_components(self):
         # return the final pipeline as a list
         self.locked = True
         return self._components
@@ -142,9 +139,10 @@ class Task(object):
 
 
 # Manages a collection of Task objects
-class TaskEngine(object):
+class TaskEngine(Pipeline):
 
     def __init__(self):
+        super().__init__()
         self._task_list = []
         self._queue_list = []
         self.database = {}  # used for data persistence across tasks
@@ -152,9 +150,6 @@ class TaskEngine(object):
         self.is_complete = False
         self._forking = False
         self._last_fork_size = None
-
-        self.pipeline = Pipeline()
-        self._queue_list.append(self.pipeline.queue)
 
         self.mpi_comm = None
         self.mpi_rank = None
@@ -177,13 +172,6 @@ class TaskEngine(object):
 
         return configuration
 
-    def add_component(self, component):
-        """
-        :param component: a Task/Fork/Join object
-        """
-        # modify the workflow with a new object
-        self.pipeline.add_component(component)
-
     def start(self):
         # log event
         self.logger.write("Starting the TaskEngine")
@@ -193,10 +181,9 @@ class TaskEngine(object):
             self._setup_mpi()
 
         # iterate through the components
-        ordered_component_list = self.pipeline.compile
+        ordered_component_list = self.compile_components()
         for c in ordered_component_list:
             if isinstance(c, Fork):
-                self._forking = True
                 tasks = self._fork(task=c.task, iterators=c.iterators)     # fork and modify kwargs
                 threads = []
                 for i, t in enumerate(tasks):
@@ -206,7 +193,6 @@ class TaskEngine(object):
                 for thread in threads:
                     thread.join()
             elif isinstance(c, Join):
-                self._forking = False
                 task = self._join(task=c.task, iterators=c.iterators)   # join and modify kwargs if iterators provided
                 self._start(task=task)
             elif isinstance(c, Task):
@@ -217,7 +203,6 @@ class TaskEngine(object):
                         thread = Thread(target=self._start, args=(t, i))
                         thread.start()
                         threads.append(thread)
-                        # self._start(task=t, fork_id=i)
                     for thread in threads:
                         thread.join()
                 else:
@@ -234,9 +219,8 @@ class TaskEngine(object):
         # add to queue list
         self._queue_list.append(task.queue)
 
-        # TODO: this MPI support is wrong
         if self.configuration['mpi']['use_mpi']:
-            # use just one mpi rank
+            # assign task to a rank
             self._use_single_rank(task=task, fork_id=fork_id)
             self.mpi_comm.WORLD_BARRIER()
         else:
@@ -248,13 +232,14 @@ class TaskEngine(object):
 
     def _use_single_rank(self, task, fork_id=None):
         """
-        :param task: Task object to be run on a single MPI rank
+        :param task: Task object to be run on rank {fork_id}
+        :param fork_id: int indicating the rank to use for the task
         """
-        # always run solo tasks on rank 0
-        if self.mpi_rank == 0:
+        if fork_id is None:
+            fork_id = 0
+        if self.mpi_rank == fork_id:
             task.start()
-            if fork_id is not None:
-                self.local_databases[fork_id] = task.local_database
+            self.local_databases[fork_id] = task.local_database
 
     def _setup_mpi(self):
         # log event
@@ -292,11 +277,12 @@ class TaskEngine(object):
         """
         # create all_args ==> [{k0: iter0_0, k1: iter1_0}, {k0: iter0_1, k1: iter1_1},...]
         # number of tasks to produce is len(all_args) OR self._last_fork_size if iterators is None
+        self._forking = True
         all_args = []
         if iterators is not None:
             i = 0
-            end = 0
-            while len(all_args) < end or end == 0:
+            end = -1
+            while len(all_args) < end or end == -1:
                 d = {}
                 _full_iterators = []
                 for key, value in iterators.items():
@@ -318,28 +304,35 @@ class TaskEngine(object):
 
         # determine number of tasks to make
         if iterators is None:
-            new_tasks = self._last_fork_size
+            n_tasks = self._last_fork_size
         else:
-            new_tasks = len(all_args)
+            n_tasks = len(all_args)
 
         # add len(all_args) tasks to self._components
         if self.local_databases is None:
-            self.local_databases = {i: self.database for i in range(new_tasks)}
+            self.local_databases = {i: self.database for i in range(n_tasks)}
+
+        # TODO: fix how the tasks kwargs are assigned
+        # right now the last value is repeated for every member of tasks
+        # create the new tasks
         i = 0
         tasks = []
-        while i < new_tasks:
+        while i < n_tasks:
+            # make new instance of Task
+            _task = task.__class__(kwargs=task.kwargs)
+            self._queue_list.append(_task.queue)
             # modify the kwargs of the forked task
             if iterators is not None:
-                task.kwargs.update(all_args[i])
+                _task.kwargs.update(all_args[i])
             # indicate forked status
-            task.is_forking = True
+            _task.is_forking = True
             # set proper local database
-            task.local_database = self.local_databases[i]
+            _task.local_database = self.local_databases[i]
             # store initialized task
-            tasks.append(task)
+            tasks.append(_task)
             i += 1
-        self._last_fork_size = new_tasks    # update the latest fork size
 
+        self._last_fork_size = n_tasks    # update the latest fork size
         return tasks
 
     def _join(self, task, iterators=None):
@@ -348,6 +341,7 @@ class TaskEngine(object):
         :param iterators: (dict) contains string keys and iterator values that will be
                                  joined from prior tasks in fork
         """
+        self._forking = False
         joined_dict = {}
         if iterators is not None:
             for key, value in iterators.items():
