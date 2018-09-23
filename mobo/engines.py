@@ -312,18 +312,21 @@ class TaskEngine(Pipeline):
         if self.local_databases is None:
             self.local_databases = {i: self.database for i in range(n_tasks)}
 
-        # TODO: fix how the tasks kwargs are assigned
-        # right now the last value is repeated for every member of tasks
         # create the new tasks
         i = 0
         tasks = []
         while i < n_tasks:
-            # make new instance of Task
+            # make new instance of incoming Task
             _task = task.__class__(kwargs=task.kwargs)
             self._queue_list.append(_task.queue)
             # modify the kwargs of the forked task
+            _kwargs = {}
+            for key, value in task.kwargs.items():
+                _kwargs[key] = value
             if iterators is not None:
-                _task.kwargs.update(all_args[i])
+                for key, value in all_args[i].items():
+                    _kwargs[key] = value
+            _task.kwargs = _kwargs
             # indicate forked status
             _task.is_forking = True
             # set proper local database
