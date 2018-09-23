@@ -4,7 +4,6 @@ A collection of iterative data analysis pipelines
 from mobo.logging import LogFile
 
 import yaml
-import time
 from queue import Queue
 from threading import Thread
 
@@ -66,15 +65,11 @@ class Pipeline(object):
 # A wrapper to conveniently modularize analysis tasks
 class Task(object):
 
-    def __init__(self, parallel, target, kwargs):
+    def __init__(self, target, kwargs):
         """
-        :param parallel: (bool) set parallel processing preference
         :param target: (function) the function to call as a task
         :param kwargs: (dict) used to store arguments for target (can contain moboKey objects to pull from DB)
         """
-        assert type(parallel) == bool
-        self._parallel = parallel
-
         assert callable(target)
         self._target = target
 
@@ -127,10 +122,9 @@ class Task(object):
             self.local_database[key] = value
         else:
             self.queue.client_queue.put((key, value))
-
-    @property
-    def parallel(self):
-        return self._parallel
+            # wait for the setting to be done to prevent KeyErrors later
+            while not self.queue.client_queue.empty():
+                continue
 
     @property
     def target(self):
@@ -203,10 +197,14 @@ class TaskEngine(object):
         for c in ordered_component_list:
             if isinstance(c, Fork):
                 self._forking = True
-                time.sleep(0.1)     # TODO: why does this prevent the program from crashing
                 tasks = self._fork(task=c.task, iterators=c.iterators)     # fork and modify kwargs
+                threads = []
                 for i, t in enumerate(tasks):
-                    self._start(task=t, fork_id=i)
+                    thread = Thread(target=self._start, args=(t, i))
+                    thread.start()
+                    threads.append(thread)
+                for thread in threads:
+                    thread.join()
             elif isinstance(c, Join):
                 self._forking = False
                 task = self._join(task=c.task, iterators=c.iterators)   # join and modify kwargs if iterators provided
@@ -214,8 +212,14 @@ class TaskEngine(object):
             elif isinstance(c, Task):
                 if self._forking:
                     tasks = self._fork(task=c)     # fork without modification of kwargs
+                    threads = []
                     for i, t in enumerate(tasks):
-                        self._start(task=t, fork_id=i)
+                        thread = Thread(target=self._start, args=(t, i))
+                        thread.start()
+                        threads.append(thread)
+                        # self._start(task=t, fork_id=i)
+                    for thread in threads:
+                        thread.join()
                 else:
                     self._start(c)  # do not fork
 
@@ -229,26 +233,17 @@ class TaskEngine(object):
         self.logger.write("Starting Task: {}".format(type(task).__name__))
         # add to queue list
         self._queue_list.append(task.queue)
-        # check for parallelization
-        if task.parallel:
-            if self.configuration['mpi']['use_mpi']:
-                # mpi will automatically do it in parallel
-                task.start()
-                if fork_id is not None:
-                    self.local_databases[fork_id] = task.local_database
-            else:
-                # do some other parallel method
-                raise NotImplementedError("mpi is currently the only supported parallel processing library")
+
+        # TODO: this MPI support is wrong
+        if self.configuration['mpi']['use_mpi']:
+            # use just one mpi rank
+            self._use_single_rank(task=task, fork_id=fork_id)
+            self.mpi_comm.WORLD_BARRIER()
         else:
-            if self.configuration['mpi']['use_mpi']:
-                # use just one mpi rank
-                self._use_single_rank(task=task, fork_id=fork_id)
-                self.mpi_comm.WORLD_BARRIER()
-            else:
-                # standard single core processing
-                task.start()
-                if fork_id is not None:
-                    self.local_databases[fork_id] = task.local_database
+            # standard single core processing
+            task.start()
+            if fork_id is not None:
+                self.local_databases[fork_id] = task.local_database
         self.logger.write("Completed Task: {}".format(type(task).__name__))
 
     def _use_single_rank(self, task, fork_id=None):

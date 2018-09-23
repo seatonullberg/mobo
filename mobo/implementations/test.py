@@ -58,6 +58,8 @@ if __name__ == "__main__":
     engine.add_component(bandwidth_fork)
 
     # remain forked to do kde sampling
+    # use another fork component because new iterator is required
+    # otherwise the Task would remained forked until join without new Fork object
     d = {'data': moboKey('grouped_subselections')}
     sample = KDEMonteCarloTask(kwargs={'bandwidth': moboKey('kde_bandwidth'),
                                        'n_samples': 50})

@@ -5,11 +5,10 @@ import numpy as np
 
 class RootMeanSquaredErrorTask(Task):
 
-    def __init__(self, kwargs, parallel=False, target=None):
+    def __init__(self, kwargs, target=None):
         if target is None:
             target = self.rms_error
-        super().__init__(parallel=parallel,
-                         target=target,
+        super().__init__(target=target,
                          kwargs=kwargs)
 
     def rms_error(self, actual, experimental):

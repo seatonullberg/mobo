@@ -6,11 +6,10 @@ import pandas as pd
 
 class GroupByColumnValue(Task):
 
-    def __init__(self, kwargs, parallel=False, target=None):
+    def __init__(self, kwargs, target=None):
         if target is None:
             target = self.subselect
-        super().__init__(parallel=parallel,
-                         target=target,
+        super().__init__(target=target,
                          kwargs=kwargs)
 
     def subselect(self, data, col_id, drop_selector):
@@ -49,11 +48,10 @@ class GroupByColumnValue(Task):
 
 class ConcatenatePairTask(Task):
 
-    def __init__(self, kwargs, parallel=False, target=None):
+    def __init__(self, kwargs, target=None):
         if target is None:
             target = self.concatenate
-        super().__init__(parallel=parallel,
-                         target=target,
+        super().__init__(target=target,
                          kwargs=kwargs)
 
     def concatenate(self, a1, a2, axis):
@@ -87,11 +85,10 @@ class ConcatenatePairTask(Task):
 
 class ConcatenateListTask(Task):
 
-    def __init__(self, kwargs, parallel=False, target=None):
+    def __init__(self, kwargs, target=None):
         if target is None:
             target = self.concatenate
-        super().__init__(parallel=parallel,
-                         target=target,
+        super().__init__(target=target,
                          kwargs=kwargs)
 
     def concatenate(self, data_list, axis):

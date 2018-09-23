@@ -4,11 +4,10 @@ from mobo.kde import silverman_h, chiu_h
 
 class KDEBandwidthTask(Task):
 
-    def __init__(self, kwargs, parallel=False, target=None):
+    def __init__(self, kwargs, target=None):
         if target is None:
             target = self.calculate_bandwidth
-        super().__init__(parallel=parallel,
-                         target=target,
+        super().__init__(target=target,
                          kwargs=kwargs)
 
     def calculate_bandwidth(self, data):

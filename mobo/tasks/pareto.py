@@ -4,11 +4,10 @@ from mobo.pareto import calculate_pareto
 
 class FilterParetoTask(Task):
 
-    def __init__(self, kwargs, parallel=False, target=None):
+    def __init__(self, kwargs, target=None):
         if target is None:
             target = self.filter
-        super().__init__(parallel=parallel,
-                         target=target,
+        super().__init__(target=target,
                          kwargs=kwargs)
 
     def filter(self, data_to_filter, data_to_apply):
@@ -20,6 +19,5 @@ class FilterParetoTask(Task):
         assert data_to_filter.shape == data_to_apply.shape
         mask = calculate_pareto(data_to_filter)
         data = data_to_apply[mask]
-        print(data.shape)
         self.set_persistent(key='pareto_data',
                             value=data)
