@@ -1,3 +1,6 @@
+from datetime import datetime
+from filelock import FileLock
+import os
 
 
 class Logger(object):
@@ -14,3 +17,18 @@ class Logger(object):
     @property
     def path(self):
         return self._path
+
+    def log(self, msg):
+        """Writes a message to the log file.
+        
+        Args:
+            msg (str): The message to write.
+        """
+        assert type(msg) is str
+        lock = FileLock(self.path+".lock")
+        with lock:
+            now = datetime.now()
+            msg = "{}\n{}\n\n".format(now, msg)
+            with open(self.path, "a") as f:
+                f.write(msg)
+        os.remove(self.path+".lock")
