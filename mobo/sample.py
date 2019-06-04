@@ -1,5 +1,5 @@
 import numpy as np
-import scipy as sp
+from scipy.stats import gaussian_kde
 
 
 class BaseSampler(object):
@@ -87,8 +87,8 @@ class KDESampler(BaseSampler):
         """
         # TODO: figure out why transpose is needed
         assert type(n) is int
-        kde = sp.stats.gaussian_kde(dataset=self.arr.T,
-                                    bw_method=self.bw)
+        kde = gaussian_kde(dataset=self.arr.T,
+                           bw_method=self.bw)
         return kde.resample(n).T
 
 class UniformSampler(BaseSampler):
@@ -101,8 +101,8 @@ class UniformSampler(BaseSampler):
 
     def __init__(self, low, high):
         super().__init__()
-        assert all((type(low) is float,
-                    type(high) is float))
+        assert all((type(low) is np.ndarray,
+                    type(high) is np.ndarray))
         assert low.shape == high.shape
         self._low = low
         self._high = high
