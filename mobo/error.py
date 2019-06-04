@@ -20,18 +20,19 @@ class AbsoluteError(BaseError):
         super().__init__()
 
     def calculate(self, a, b):
-        """Calculates the absolute error between two scalars.
+        """Calculates the absolute error between two arrays.
 
         Args:
-            a (float): The first scalar.
-            b (float): The second scalar.
+            a (numpy.ndarray): The first array.
+            b (numpy.ndarray): The second array.
 
         Returns:
-            float
+            numpy.ndarray
         """
-        assert all((type(a) is float,
-                    type(b) is float))
-        return abs(a - b)
+        assert all((type(a) is np.ndarray,
+                    type(b) is np.ndarray))
+        assert a.shape == b.shape
+        return np.absolute(a - b)
 
 
 class LogCoshError(BaseError):
@@ -41,17 +42,18 @@ class LogCoshError(BaseError):
         super().__init__()
 
     def calculate(self, a, b):
-        """Calculates the log cosh error between two scalars.
+        """Calculates the log cosh error between two arrays.
 
         Args:
-            a (float): The first scalar.
-            b (float): The second scalar.
+            a (numpy.ndarray): The first array.
+            b (numpy.ndarray): The second array.
 
         Returns:
-            float
+            numpy.ndarray
         """
-        assert all((type(a) is float,
-                    type(b) is float))
+        assert all((type(a) is np.ndarray,
+                    type(b) is np.ndarray))
+        assert a.shape == b.shape
         return np.log(np.cosh(a - b))
 
 
@@ -62,16 +64,16 @@ class SquaredError(BaseError):
         super().__init__()
 
     def calculate(self, a, b):
-        """Calculates the squared error between two scalars.
+        """Calculates the squared error between two arrays.
 
         Args:
-            a (float): The first scalar.
-            b (float): The second scalar.
+            a (numpy.ndarray): The first array.
+            b (numpy.ndarray): The second array.
 
         Returns:
-            float
+            numpy.ndarray
         """
-        assert all((type(a) is float,
-                    type(b) is float))
+        assert all((type(a) is np.ndarray,
+                    type(b) is np.ndarray))
+        assert a.shape == b.shape
         return (a - b)**2
-

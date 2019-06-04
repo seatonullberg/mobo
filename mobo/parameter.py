@@ -5,19 +5,21 @@ class Parameter(object):
 
     Args:
         name (str): Name of the parameter.
-        lower (optional) (float): Minimum acceptable value.
-        upper (optional) (float): Maximum acceptable value.
+        low (optional) (float): Minimum acceptable value.
+        high (optional) (float): Maximum acceptable value.
         fixed (optional) (float): Fixed value for constant parameters.
     """
 
-    def __init__(self, name, lower=None, upper=None, fixed=None):
+    def __init__(self, name, low=None, high=None, fixed=None):
         assert type(name) is str
-        assert all((type(lower) in [float, NoneType],
-                    type(upper) in [float, NoneType],
+        assert all((type(low) in [float, NoneType],
+                    type(high) in [float, NoneType],
                     type(fixed) in [float, NoneType]))
+        if type(low) is float and type(high) is float:
+            assert low < high
         self._name = name,
-        self._lower = lower
-        self._upper = upper
+        self._low = low
+        self._high = high
         self._fixed = fixed
 
     @property
@@ -25,12 +27,12 @@ class Parameter(object):
         return self._name
 
     @property
-    def lower(self):
-        return self._lower
+    def low(self):
+        return self._low
 
     @property
-    def upper(self):
-        return self._upper
+    def high(self):
+        return self._high
 
     @property
     def fixed(self):
