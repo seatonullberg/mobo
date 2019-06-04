@@ -1,7 +1,7 @@
 
 
 class QoI(object):
-    """Implementation of a quantity of interest to optimize.
+    """Implementation of a quantity of interest to evaluate.
 
     Args:
         name (str): Name of the qoi.
