@@ -1,6 +1,6 @@
 
 
-class QOI(object):
+class QoI(object):
     """Implementation of a quantity of interest to optimize.
 
     Args:
