@@ -1,4 +1,6 @@
-from mobo.error import AbsoluteError, LogCoshError, SquaredError
+from mobo.error import (AbsoluteErrorCalculator, 
+                        LogCoshErrorCalculator, 
+                        SquaredErrorCalculator)
 import numpy as np
 
 
@@ -7,21 +9,21 @@ b = np.random.normal(size=(100, 3))
 
 
 def test_absolute_error():
-    ae = AbsoluteError()
+    ae = AbsoluteErrorCalculator()
     err = ae.calculate(a, b)
     assert type(err) is np.ndarray
     assert err.shape == a.shape == b.shape
 
 
 def test_log_cosh_error():
-    lce = LogCoshError()
+    lce = LogCoshErrorCalculator()
     err = lce.calculate(a, b)
     assert type(err) is np.ndarray
     assert err.shape == a.shape == b.shape
 
 
 def test_squared_error():
-    se = SquaredError()
+    se = SquaredErrorCalculator()
     err = se.calculate(a, b)
     assert type(err) is np.ndarray
     assert err.shape == a.shape == b.shape

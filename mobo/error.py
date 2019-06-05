@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class BaseError(object):
+class BaseErrorCalculator(object):
     """Representation of a general error calculator."""
 
     def __init__(self):
@@ -13,7 +13,7 @@ class BaseError(object):
         raise NotImplementedError(err)
 
 
-class AbsoluteError(BaseError):
+class AbsoluteErrorCalculator(BaseErrorCalculator):
     """Implementation of the absolute error calculator."""
 
     def __init__(self):
@@ -35,7 +35,7 @@ class AbsoluteError(BaseError):
         return np.absolute(a - b)
 
 
-class LogCoshError(BaseError):
+class LogCoshErrorCalculator(BaseErrorCalculator):
     """Implementation of the log cosh error calculator."""
 
     def __init__(self):
@@ -57,7 +57,7 @@ class LogCoshError(BaseError):
         return np.log(np.cosh(a - b))
 
 
-class SquaredError(BaseError):
+class SquaredErrorCalculator(BaseErrorCalculator):
     """Implementation of the squared error calculator."""
 
     def __init__(self):

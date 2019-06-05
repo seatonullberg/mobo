@@ -1,4 +1,6 @@
-from mobo.error import AbsoluteError, LogCoshError, SquaredError
+from mobo.error import (AbsoluteErrorCalculator, 
+                        LogCoshErrorCalculator, 
+                        SquaredErrorCalculator)
 from mobo.filter import ParetoFilter, PercentileFilter
 from mobo.filter import IntersectionalFilterSet, SequentialFilterSet
 from mobo.log import Logger

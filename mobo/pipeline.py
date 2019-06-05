@@ -3,6 +3,7 @@ from mobo.qoi import QoI
 from mobo.log import Logger
 from mobo.sample import BaseSampler
 from mobo.filter import BaseFilterSet
+from mobo.error import BaseErrorCalculator
 from mpi4py import MPI
 import numpy as np
 
@@ -69,6 +70,7 @@ class PipelineSegment(object):
     Args:
         sampler (instance of BaseSampler): Sampler to draw samples with.
         filter_set (instance of BaseFilterSet): Filters to apply.
+        err_calc (instance of BaseError): The error calculator to use.
         logger (optional) (Logger): Centralized file logger.
         TODO: splitter / subroutines
 
@@ -76,12 +78,14 @@ class PipelineSegment(object):
         prior (numpy.ndarray): Data from a prior segment.
     """
     
-    def __init__(self, sampler, filter_set, logger=None):
+    def __init__(self, sampler, filter_set, err_calc, logger=None):
         assert isinstance(sampler, BaseSampler)
         assert isinstance(filter_set, BaseFilterSet)
+        assert isinstance(err_calc, BaseError)
         assert type(logger) in [Logger, NoneType]
         self._sampler = sampler
         self._filter_set = filter_set
+        self._err_calc = err_calc
         self._logger = logger
         self._prior = None
 
@@ -92,6 +96,10 @@ class PipelineSegment(object):
     @property
     def filter_set(self):
         return self._filter_set
+
+    @property
+    def err_calc(self):
+        return self._err_calc
 
     @property
     def logger(self):
@@ -106,6 +114,11 @@ class PipelineSegment(object):
         assert self._prior is None  # only set this once
         assert type(value) is np.ndarray
         self._prior = value
+
+    # TODO
+    def execute(self):
+        """Execute this segment of the optimization process."""
+        pass
     
     def _log(self, msg):
         if self.logger is not None:
