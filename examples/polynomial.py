@@ -34,10 +34,10 @@ if __name__ == "__main__":
     # plt.plot(x, y)
     # plt.show()
 
-    param_a = mobo.Parameter(name="a", low=0, high=1)
-    param_b = mobo.Parameter(name="b", low=0, high=1)
-    param_c = mobo.Parameter(name="c", low=0, high=1)
-    param_d = mobo.Parameter(name="d", low=0, high=1)
+    param_a = mobo.Parameter(name="a", low=0.0, high=1.0)
+    param_b = mobo.Parameter(name="b", low=0.0, high=1.0)
+    param_c = mobo.Parameter(name="c", low=0.0, high=1.0)
+    param_d = mobo.Parameter(name="d", low=0.0, high=1.0)
 
     parameters = (param_a, param_b, param_c, param_d)
 
@@ -52,6 +52,24 @@ if __name__ == "__main__":
                         evaluator=evaluate_high)
     
     qois = (qoi_low, qoi_mid, qoi_high)
+
+    sampler = mobo.GaussianSampler(mean=np.array([0.0, 0.0, 0.0, 0.0]),
+                                   std=np.array([1.0, 1.0, 1.0, 1.0]))
+
+    pareto_filter = mobo.ParetoFilter()
+    filter_set = mobo.IntersectionalFilterSet(filters=[pareto_filter])
+
+    err_calc = mobo.SquaredErrorCalculator()
+
+    n_samples = 10000
+
+    segment1 = mobo.PipelineSegment(sampler, filter_set, err_calc, n_samples)
+
+    logger = mobo.Logger()
+
+    pipeline = mobo.Pipeline(parameters, qois, [segment1], logger)
+
+    pipeline.execute()
 
     # TODO
     # - pipeline initialization

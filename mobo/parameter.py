@@ -12,9 +12,9 @@ class Parameter(object):
 
     def __init__(self, name, low=None, high=None, fixed=None):
         assert type(name) is str
-        assert all((type(low) in [float, NoneType],
-                    type(high) in [float, NoneType],
-                    type(fixed) in [float, NoneType]))
+        assert all((type(low) in [float, type(None)],
+                    type(high) in [float, type(None)],
+                    type(fixed) in [float, type(None)]))
         if type(low) is float and type(high) is float:
             assert low < high
         self._name = name,
