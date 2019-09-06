@@ -2,78 +2,51 @@ import numpy as np
 
 
 class BaseErrorCalculator(object):
-    """Representation of a general error calculator."""
-
-    def __init__(self):
-        pass
-
-    def calculate(self, *args, **kwargs):
-        err = ("{} does not implement the required `calculate` method."
-               .format(self.__class__.__name__))
-        raise NotImplementedError(err)
+    """Abstract base class for ErrorCalculators."""
+    def calculate(self, actual, target):
+        raise NotImplementedError()
 
 
 class AbsoluteErrorCalculator(BaseErrorCalculator):
-    """Implementation of the absolute error calculator."""
-
-    def __init__(self):
+    """Calculator of absolute error."""
+    def __init__(self) -> None:
         super().__init__()
 
-    def calculate(self, a, b):
-        """Calculates the absolute error between two arrays.
-
+    def calculate(self, actual: np.ndarray, target: np.ndarray) -> np.ndarray:
+        """Calculates the absolute difference between two arrays.
+        
         Args:
-            a (numpy.ndarray): The first array.
-            b (numpy.ndarray): The second array.
-
-        Returns:
-            numpy.ndarray
+            actual: Array of actual values.
+            target: Array of target values.
         """
-        assert all((type(a) is np.ndarray,
-                    type(b) is np.ndarray))
-        assert a.shape == b.shape
-        return np.absolute(a - b)
+        return np.absolute(actual - target)
 
 
 class LogCoshErrorCalculator(BaseErrorCalculator):
-    """Implementation of the log cosh error calculator."""
-
-    def __init__(self):
+    """Calculator of log cosh error."""
+    def __init__(self) -> None:
         super().__init__()
 
-    def calculate(self, a, b):
+    def calculate(self, actual: np.ndarray, target: np.ndarray) -> np.ndarray:
         """Calculates the log cosh error between two arrays.
-
+        
         Args:
-            a (numpy.ndarray): The first array.
-            b (numpy.ndarray): The second array.
-
-        Returns:
-            numpy.ndarray
-        """
-        assert all((type(a) is np.ndarray,
-                    type(b) is np.ndarray))
-        assert a.shape == b.shape
-        return np.log(np.cosh(a - b))
+            actual: Array of actual values.
+            target: Array of target values.
+        """ 
+        return np.log(np.cosh(actual - target))
 
 
 class SquaredErrorCalculator(BaseErrorCalculator):
-    """Implementation of the squared error calculator."""
-
-    def __init__(self):
+    """Calculator of squared error."""
+    def __init__(self) -> None:
         super().__init__()
 
-    def calculate(self, a, b):
-        """Calculates the squared error between two arrays.
+    def calculate(self, actual: np.ndarray, target: np.ndarray) -> np.ndarray:
+        """ Calculates the squared error between two arrays.
 
         Args:
-            a (numpy.ndarray): The first array.
-            b (numpy.ndarray): The second array.
-
-        Returns:
-            numpy.ndarray
+            actual: Array of actual values.
+            target: Array of target values.
         """
-        assert all((type(a) is np.ndarray,
-                    type(b) is np.ndarray))
-        assert a.shape == b.shape
-        return (a - b)**2
+        return (actual - target)**2

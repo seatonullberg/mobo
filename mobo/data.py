@@ -1,37 +1,73 @@
 from mobo.parameter import Parameter
 from mobo.qoi import QoI
+import numpy as np
 import pandas as pd
+from typing import List, Optional
 
 
 class OptimizationData(object):
-    """Underlying data collected throughout the optimization process.
+    """Data which gets passed through a pipeline.
     
     Args:
-        parameters (iterable of Parameter): The parameters to optimize.
-        qois (iterable of QoI): The quantities of interest to evaluate.
+        paramters: List of Parameter objects.
+        qois: List of QoI objects.
     """
+    def __init__(self, parameters: List[Parameter], qois: List[QoI]) -> None:
+        self._parameter_names = [p.name for p in parameters]
+        self._qoi_names = [q.name for q in qois]
+        self._error_names = ["{}.error".format(q.name) for q in qois]
+        columns = (
+            ["id"] + self._parameter_names + self._qoi_names
+            + self._error_names + ["cluster_id"]
+        )
+        self._df = pd.DataFrame(columns=columns)
 
-    def __init__(self, parameters, qois):
-        for p in parameters:
-            assert type(p) is Parameter
-        for q in qois:
-            assert type(q) is QoI
-        p_names = ["p."+p.name for p in parameters]  # parameter names
-        q_names = ["q."+q.name for q in qois]  # qoi names
-        e_names = ["e."+q.name for q in qois]  # error names
-        self._df = pd.DataFrame(columns=p_names+q_names+e_names)
-        self._parameters = parameters
-        self._qois = qois
+    @classmethod
+    def from_file(cls, path: str):
+        pass
+
+    def to_file(self, path: str) -> None:
+        pass
+
+    # TODO: enable more than single row addition
+    def append(self, iteration: int,
+               parameter_values: np.ndarray, 
+               qoi_values: np.ndarray,
+               error_values: np.ndarray, 
+               cluster_id: Optional[np.ndarray] = None) -> None:
+        id_fmt = "{}_{}"
+        id_strs = [
+            id_fmt.format(iteration, _id) 
+            for _id in range(self._df.shape[0], 
+                             self._df.shape[0] + len(parameter_values))
+        ]
+        if cluster_id is None:
+            cluster_id = np.array([np.nan for _ in parameter_values])
+        data = (
+            id_strs + parameter_values.tolist() + qoi_values.tolist()
+            + error_values.tolist() + cluster_id.tolist()
+        )
+        self._df.append(pd.DataFrame(data=data, columns=self._df.columns))
+
+    def drop(self, indices: np.ndarray) -> None:
+        self._df.drop(indices, inplace=True)
 
     @property
-    def df(self):
-        return self._df
+    def parameter_values(self) -> np.ndarray:
+        return self._df[self._parameter_names].to_numpy()
 
     @property
-    def parameters(self):
-        return self._parameters
+    def qoi_values(self) -> np.ndarray:
+        return self._df[self._qoi_names].to_numpy()
 
     @property
-    def qois(self):
-        return self._qois
+    def error_values(self) -> np.ndarray:
+        return self._df[self._error_names].to_numpy()
 
+    @property
+    def ids(self) -> np.ndarray:
+        return self._df["id"].to_numpy()
+
+    @property
+    def cluster_ids(self) -> np.ndarray:
+        return self._df["cluster_id"].to_numpy()
