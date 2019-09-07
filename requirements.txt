@@ -2,4 +2,4 @@ numpy
 scipy
 filelock
 mpi4py
-pandas
+pandas >= 0.24.0

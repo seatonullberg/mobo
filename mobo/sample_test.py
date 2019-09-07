@@ -1,10 +1,11 @@
 from mobo.sample import GaussianSampler, KDESampler, UniformSampler
 import numpy as np
+from scipy.stats import gaussian_kde
 
 
 n = 10
+rows = 100
 cols = 3
-prior = np.random.uniform(size=(100, cols))
 
 
 def test_gaussian_sampler():
@@ -18,8 +19,8 @@ def test_gaussian_sampler():
 
 
 def test_gaussian_sampler_from_prior():
-    gs = GaussianSampler()
-    gs.from_prior(prior)
+    prior = np.random.uniform(size=(rows, cols))
+    gs = GaussianSampler.from_prior(prior)
     samples = gs.draw(n)
     assert type(samples) is np.ndarray
     assert samples.shape[0] == n
@@ -29,7 +30,7 @@ def test_gaussian_sampler_from_prior():
 def test_kde_sampler():
     arr = np.random.normal(size=(100, cols))
     bw = 0.1
-    ks = KDESampler(arr=arr, bw=bw)
+    ks = KDESampler(bw, arr)
     samples = ks.draw(n)
     assert type(samples) is np.ndarray
     assert samples.shape[0] == n
@@ -37,8 +38,9 @@ def test_kde_sampler():
 
 
 def test_kde_sampler_from_prior():
-    ks = KDESampler()
-    ks.from_prior(prior)
+    prior = np.random.uniform(size=(rows, cols))
+    prior = gaussian_kde(prior)
+    ks = KDESampler.from_prior(prior)
     samples = ks.draw(n)
     assert type(samples) is np.ndarray
     assert samples.shape[0] == n
@@ -48,7 +50,7 @@ def test_kde_sampler_from_prior():
 def test_uniform_sampler():
     low = np.array([0.0 for i in range(cols)])
     high = np.array([1.0 for i in range(cols)])
-    us = UniformSampler(low=low, high=high)
+    us = UniformSampler(low, high)
     samples = us.draw(n)
     assert type(samples) is np.ndarray
     assert samples.shape[0] == n
@@ -58,8 +60,8 @@ def test_uniform_sampler():
 
 
 def test_uniform_sampler_from_prior():
-    us = UniformSampler()
-    us.from_prior(prior)
+    prior = np.random.uniform(size=(rows, cols), low=0, high=1)
+    us = UniformSampler.from_prior(prior)
     samples = us.draw(n)
     assert type(samples) is np.ndarray
     assert samples.shape[0] == n

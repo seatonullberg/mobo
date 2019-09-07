@@ -7,7 +7,7 @@ from typing import List, Optional
 
 class OptimizationData(object):
     """Data which gets passed through a pipeline.
-    
+
     Args:
         paramters: List of Parameter objects.
         qois: List of QoI objects.
@@ -24,50 +24,56 @@ class OptimizationData(object):
 
     @classmethod
     def from_file(cls, path: str):
+        # TODO
         pass
 
     def to_file(self, path: str) -> None:
+        # TODO
         pass
 
-    # TODO: enable more than single row addition
     def append(self, iteration: int,
-               parameter_values: np.ndarray, 
+               parameter_values: np.ndarray,
                qoi_values: np.ndarray,
-               error_values: np.ndarray, 
+               error_values: np.ndarray,
                cluster_id: Optional[np.ndarray] = None) -> None:
         id_fmt = "{}_{}"
         id_strs = [
-            id_fmt.format(iteration, _id) 
-            for _id in range(self._df.shape[0], 
+            id_fmt.format(iteration, _id)
+            for _id in range(self._df.shape[0],
                              self._df.shape[0] + len(parameter_values))
         ]
         if cluster_id is None:
             cluster_id = np.array([np.nan for _ in parameter_values])
-        data = (
-            id_strs + parameter_values.tolist() + qoi_values.tolist()
-            + error_values.tolist() + cluster_id.tolist()
-        )
-        self._df.append(pd.DataFrame(data=data, columns=self._df.columns))
+        data = {}
+        data["id"] = id_strs
+        for i, p_name in enumerate(self._parameter_names):
+            data[p_name] = parameter_values[i]
+        for i, q_name in enumerate(self._qoi_names):
+            data[q_name] = qoi_values[i]
+        for i, e_name in enumerate(self._error_names):
+            data[e_name] = error_values[i]
+        data["cluster_id"] = cluster_id
+        self._df = self._df.append(pd.DataFrame(data=data, columns=self._df.columns))
 
     def drop(self, indices: np.ndarray) -> None:
         self._df.drop(indices, inplace=True)
 
     @property
     def parameter_values(self) -> np.ndarray:
-        return self._df[self._parameter_names].to_numpy()
+        return self._df[self._parameter_names].to_numpy().flatten()
 
     @property
     def qoi_values(self) -> np.ndarray:
-        return self._df[self._qoi_names].to_numpy()
+        return self._df[self._qoi_names].to_numpy().flatten()
 
     @property
     def error_values(self) -> np.ndarray:
-        return self._df[self._error_names].to_numpy()
+        return self._df[self._error_names].to_numpy().flatten()
 
     @property
     def ids(self) -> np.ndarray:
-        return self._df["id"].to_numpy()
+        return self._df["id"].to_numpy().flatten()
 
     @property
     def cluster_ids(self) -> np.ndarray:
-        return self._df["cluster_id"].to_numpy()
+        return self._df["cluster_id"].to_numpy().flatten()

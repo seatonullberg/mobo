@@ -15,7 +15,7 @@ class BaseSampler(object):
 
 class GaussianSampler(BaseSampler):
     """Gaussian distribution sampler.
-    
+
     Args:
         mean: Mean of the distribution.
         std: Standard deviation of the distribution.
@@ -27,7 +27,7 @@ class GaussianSampler(BaseSampler):
     @classmethod
     def from_prior(cls, distribution: np.ndarray):
         """Initializes the sampler from a prior distribution.
-        
+
         Args:
             distribution: Array representing the prior distribution.
         """
@@ -37,24 +37,24 @@ class GaussianSampler(BaseSampler):
 
     def draw(self, n_samples: int) -> np.ndarray:
         """Draws samples from the distribution.
-        
+
         Args:
             n_samples: Number of samples to draw.
         """
-        return np.random.normal(loc=self.mean, 
-                                scale=self.std, 
+        return np.random.normal(loc=self.mean,
+                                scale=self.std,
                                 size=(n_samples, self.mean.shape[0]))
 
 
 class KDESampler(BaseSampler):
     """Kernel Density Estimation sampler.
-    
+
     Args:
         bandwidth_method: Bandwidth algorithm or value to use in estimation.
         distribution: A distribution to evaluate the KDE over.
     """
     def __init__(self, bandwidth_method: Any, distribution: np.ndarray) -> None:
-        self.kde = gaussian_kde(distribution, bandwidth_method)
+        self.kde = gaussian_kde(distribution.T, bandwidth_method)
 
     @classmethod
     def from_prior(cls, distribution: gaussian_kde):
@@ -62,7 +62,7 @@ class KDESampler(BaseSampler):
 
     def draw(self, n_samples: int) -> np.ndarray:
         """Draws samples from the distribution.
-        
+
         Args:
             n_samples: Number of samples to draw.
         """
@@ -71,12 +71,12 @@ class KDESampler(BaseSampler):
 
 class UniformSampler(BaseSampler):
     """Uniform distribution sampler.
-    
+
     Args:
         lower_bound: Lower bound of the sampling interval.
         upper_bound: Upper bound of the sampling interval.
     """
-    def __init__(self, lower_bound: np.ndarray, 
+    def __init__(self, lower_bound: np.ndarray,
                  upper_bound: np.ndarray) -> None:
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
@@ -88,7 +88,7 @@ class UniformSampler(BaseSampler):
 
     def draw(self, n_samples: int) -> np.ndarray:
         """Draws samples from the distribution.
-        
+
         Args:
             n_samples: Number of samples to draw.
         """

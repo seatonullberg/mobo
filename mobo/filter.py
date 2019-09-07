@@ -37,7 +37,7 @@ class PercentileFilter(BaseFilter):
         cost_function: Function to calculate costs.
         percentile: The percentile rank to accept.
     """
-    def __init__(self, cost_function: Callable, percentile: int) -> np.ndarray:
+    def __init__(self, cost_function: Callable, percentile: int) -> None:
         self.cost_function = cost_function
         self.percentile = percentile
 
