@@ -1,56 +1,75 @@
+from mobo.data import OptimizationData
 from mobo.filter import ParetoFilter, PercentileFilter
 from mobo.filter import IntersectionalFilterSet, SequentialFilterSet
+from mobo.parameter import Parameter
+from mobo.qoi import QoI
 import numpy as np
-
-
-costs = np.random.normal(size=(100, 3))
 
 
 def test_pareto_filter():
     pf = ParetoFilter()
+    costs = np.random.normal(size=(100, 3))
     mask = pf.apply(costs)
     filtered_data = costs[mask]
     assert filtered_data.shape[0] < costs.shape[0]
 
-"""
 def test_percentile_filter():
-    pf = PercentileFilter(percentile=5)
-    mask = pf.apply(costs)
-    filtered_data = costs[mask]
-    assert 4 <= filtered_data.shape[0] <= 6
-
+    pf = PercentileFilter(cost_function=lambda x: x.sum(axis=1),
+                          percentile=5)
+    error = np.random.normal(size=(100, 3))
+    mask = pf.apply(error)
+    error = error[mask]
+    assert error.shape[0] == 5
 
 def test_intersectional_filter_set():
-    # 0 filters
-    filters = []
-    ifs = IntersectionalFilterSet(filters=filters)
-    result0 = ifs.apply(costs)
-    assert result0.shape == costs.shape  # no change
-    # 1 filter
-    filters = [PercentileFilter(95)]
-    ifs = IntersectionalFilterSet(filters=filters)
-    result1 = ifs.apply(costs)
-    assert 94 <= result1.shape[0] <= 96
-    # 2 filters
-    filters = [PercentileFilter(95), ParetoFilter()]
-    ifs = IntersectionalFilterSet(filters=filters)
-    result2 = ifs.apply(costs)
-    assert result2.shape[0] < result1.shape[0]
+    pareto_filter = ParetoFilter()
+    percentile_filter = PercentileFilter(
+        cost_function=lambda x: x.sum(axis=1),
+        percentile=25
+    )
+    filters = [pareto_filter, percentile_filter]
+    filter_set = IntersectionalFilterSet(filters)
+    # mock optimization data
+    nrows = 1000
+    p_values = np.random.normal(size=(nrows, 3))
+    q_values = np.random.normal(size=(nrows, 2))
+    e_values = np.random.normal(size=(nrows, 2))
+    parameters = [
+        Parameter("p0"), Parameter("p1"), Parameter("p2")
+    ]
+    evaluator = lambda x: x
+    qois = [
+        QoI(evaluator, "q0", 1.0), QoI(evaluator, "q1", 1.0)
+    ]
+    data = OptimizationData(parameters, qois)
+    data.append(1, p_values, q_values, e_values)
+    filter_set.apply(data)
+    # ensure filtering has been done
+    assert 0 < data.parameter_values.shape[0] < nrows
 
-def test_sequantial_filter_set():
-    # 0 filters
-    filters = []
-    sfs = SequentialFilterSet(filters=filters)
-    result0 = sfs.apply(costs)
-    assert result0.shape == costs.shape  # no change
-    # 1 filter
-    filters = [PercentileFilter(95)]
-    sfs = SequentialFilterSet(filters=filters)
-    result1 = sfs.apply(costs)
-    assert 94 <= result1.shape[0] <= 96
-    # 2 filters
-    filters = [PercentileFilter(95), ParetoFilter()]
-    sfs = SequentialFilterSet(filters=filters)
-    result2 = sfs.apply(costs)
-    assert result2.shape[0] < result1.shape[0]
-"""
+
+def test_sequential_filter_set():
+    pareto_filter = ParetoFilter()
+    percentile_filter = PercentileFilter(
+        cost_function=lambda x: x.sum(axis=1),
+        percentile=25
+    )
+    filters = [pareto_filter, percentile_filter]
+    filter_set = SequentialFilterSet(filters)
+    # mock optimization data
+    nrows = 1000
+    p_values = np.random.normal(size=(nrows, 3))
+    q_values = np.random.normal(size=(nrows, 2))
+    e_values = np.random.normal(size=(nrows, 2))
+    parameters = [
+        Parameter("p0"), Parameter("p1"), Parameter("p2")
+    ]
+    evaluator = lambda x: x
+    qois = [
+        QoI(evaluator, "q0", 1.0), QoI(evaluator, "q1", 1.0)
+    ]
+    data = OptimizationData(parameters, qois)
+    data.append(1, p_values, q_values, e_values)
+    filter_set.apply(data)
+    # ensure filtering has been done
+    assert 0 < data.parameter_values.shape[0] < nrows    

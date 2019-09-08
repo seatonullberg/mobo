@@ -49,7 +49,7 @@ class PercentileFilter(BaseFilter):
         """
         costs = self.cost_function(error)
         critical_value = np.percentile(costs, self.percentile)
-        return costs <= critical_value
+        return np.array([c <= critical_value for c in costs])
 
 
 class BaseFilterSet(object):
