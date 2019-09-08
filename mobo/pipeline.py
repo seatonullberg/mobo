@@ -1,8 +1,5 @@
 # TODO: This is all garbage
 
-
-
-
 from mobo.parameter import Parameter
 from mobo.qoi import QoI
 from mobo.log import Logger
@@ -25,7 +22,6 @@ class Pipeline(object):
         logger (optional) (Logger): Centralized file logger.
         mpi_comm (optional) (mpi4py.MPI.COMM_WORLD): MPI communication object.
     """
-    
     def __init__(self, parameters, qois, segments, logger=None, mpi_comm=None):
         for p in parameters:
             assert isinstance(p, Parameter)
@@ -44,7 +40,7 @@ class Pipeline(object):
     @property
     def parameters(self):
         return self._parameters
-    
+
     @property
     def qois(self):
         return self._qois
@@ -73,8 +69,8 @@ class Pipeline(object):
             res = s.execute()  # TODO
             end_time = datetime.now()
             seconds = (end_time - start_time).total_seconds()
-            msg = ("Completed segment number {} in {} seconds."
-                   .format(i, seconds))
+            msg = ("Completed segment number {} in {} seconds.".format(
+                i, seconds))
             self._log(msg)
 
     def _log(self, msg):
@@ -97,7 +93,6 @@ class PipelineSegment(object):
         qois (iterable of QoI): Quantities of interest to evaluate.
         prior (numpy.ndarray): Data from a prior segment.
     """
-    
     def __init__(self, sampler, filter_set, err_calc, n_samples, logger=None):
         assert isinstance(sampler, BaseSampler)
         assert isinstance(filter_set, BaseFilterSet)
@@ -169,7 +164,7 @@ class PipelineSegment(object):
     # TODO
     def execute(self):
         """Execute this segment of the optimization process."""
-        
+
         if self.prior is None:
             self._log("Drawing samples without a prior distribution...")
         else:
@@ -179,11 +174,11 @@ class PipelineSegment(object):
         samples = self.sampler.draw(self.n_samples)
 
         self._log("Evaluating the parameterizations...")
-        
+
         if self.qois is None:
             err = "`self.qois` must be set before parameter evaluation."
             raise ValueError(err)
-        
+
         for q in self.qois:
             msg = "Evaluating {} for all parameterizations...".format(q.name)
             self._log(msg)
@@ -196,7 +191,7 @@ class PipelineSegment(object):
         # calculate error
         # (normalize)
         # filter results
-    
+
     def _log(self, msg):
         if self.logger is not None:
             self.logger.log(msg)

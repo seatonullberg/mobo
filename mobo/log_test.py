@@ -15,7 +15,7 @@ def test_logger_parallel():
 
     def inner_log(lgr, m):
         lgr.log(m)
-    
+
     t0 = Thread(target=inner_log, args=(logger, "test0"))
     t1 = Thread(target=inner_log, args=(logger, "test1"))
     t0.start()

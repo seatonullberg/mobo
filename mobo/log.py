@@ -9,7 +9,6 @@ class Logger(object):
     Args:
         path (optional) (str): Path to the log file.
     """
-
     def __init__(self, path="mobo.log"):
         assert type(path) is str
         self._path = path
@@ -25,10 +24,10 @@ class Logger(object):
             msg (str): The message to write.
         """
         assert type(msg) is str
-        lock = FileLock(self.path+".lock")
+        lock = FileLock(self.path + ".lock")
         with lock:
             now = datetime.now()
             msg = "{}\n{}\n\n".format(now, msg)
             with open(self.path, "a") as f:
                 f.write(msg)
-        os.remove(self.path+".lock")
+        os.remove(self.path + ".lock")

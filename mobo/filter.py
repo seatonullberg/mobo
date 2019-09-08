@@ -61,7 +61,6 @@ class BaseFilterSet(object):
 # TODO: Implement with OptimizationData
 
 
-
 class IntersectionalFilterSet(BaseFilterSet):
     """Filter set which applies all filters simultaneously.
 

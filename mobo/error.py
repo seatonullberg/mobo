@@ -33,7 +33,7 @@ class LogCoshErrorCalculator(BaseErrorCalculator):
         Args:
             actual: Array of actual values.
             target: Array of target values.
-        """ 
+        """
         return np.log(np.cosh(actual - target))
 
 

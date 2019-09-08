@@ -1,7 +1,6 @@
 from mobo.error import AbsoluteErrorCalculator, LogCoshErrorCalculator, SquaredErrorCalculator
 import numpy as np
 
-
 a = np.random.normal(size=(999, 9))
 b = np.random.normal(size=(999, 9))
 

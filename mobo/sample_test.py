@@ -2,7 +2,6 @@ from mobo.sample import GaussianSampler, KDESampler, UniformSampler
 import numpy as np
 from scipy.stats import gaussian_kde
 
-
 n = 10
 rows = 100
 cols = 3

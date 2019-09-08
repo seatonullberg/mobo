@@ -53,7 +53,8 @@ class KDESampler(BaseSampler):
         bandwidth_method: Bandwidth algorithm or value to use in estimation.
         distribution: A distribution to evaluate the KDE over.
     """
-    def __init__(self, bandwidth_method: Any, distribution: np.ndarray) -> None:
+    def __init__(self, bandwidth_method: Any,
+                 distribution: np.ndarray) -> None:
         self.kde = gaussian_kde(distribution.T, bandwidth_method)
 
     @classmethod
@@ -83,8 +84,7 @@ class UniformSampler(BaseSampler):
 
     @classmethod
     def from_prior(cls, distribution: np.ndarray):
-        return cls(distribution.min(axis=0),
-                   distribution.max(axis=0))
+        return cls(distribution.min(axis=0), distribution.max(axis=0))
 
     def draw(self, n_samples: int) -> np.ndarray:
         """Draws samples from the distribution.

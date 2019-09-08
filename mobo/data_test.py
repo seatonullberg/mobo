@@ -14,16 +14,13 @@ def test_optimization_data_append_and_drop():
     q_values = np.random.normal(size=(nrows, 1))
     e_values = np.random.normal(size=(nrows, 1))
     # append test
-    data.append(iteration,
-                p_values,
-                q_values,
-                e_values)
+    data.append(iteration, p_values, q_values, e_values)
     print(data.parameter_values.shape)
     print(p_values.shape)
     assert np.array_equal(data.parameter_values, p_values)
     assert np.array_equal(data.qoi_values, q_values)
     assert np.array_equal(data.error_values, e_values)
-    assert data.ids[-1] == "1_{}".format(nrows-1)
+    assert data.ids[-1] == "1_{}".format(nrows - 1)
     for cid in data.cluster_ids:
         assert np.isnan(cid)
     # drop test
