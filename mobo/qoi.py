@@ -1,31 +1,18 @@
+from typing import Callable
 
 
 class QoI(object):
-    """Implementation of a quantity of interest to evaluate.
+    """A quantity of interest to be evaluated during optimization.
+    
+    Notes:
+        - `evaluator` should expect a dict of parameter names, values.
 
     Args:
-        name (str): Name of the qoi.
-        target (float): Target value to optimize towards.
-        evaluator (function): Evaluation function.
+        evaluator: Evaluation function. 
+        name: Name of the qoi.
+        target: Target value of the qoi.
     """
-
-    def __init__(self, name, target, evaluator):
-        assert type(name) is str
-        assert type(target) is float
-        assert callable(evaluator)
-        self._name = name
-        self._target = target
-        self._evaluator = evaluator
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def target(self):
-        return self._target
-
-    @property
-    def evaluator(self):
-        return self._evaluator
-
+    def __init__(self, evaluator: Callable, name: str, target: float) -> None:
+        self.evaluator = evaluator
+        self.name = name
+        self.target = target

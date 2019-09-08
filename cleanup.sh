@@ -1,4 +1,0 @@
-#!/bin/bash
-find . | grep -E "(__pycache__|\.pyc)" | xargs rm -rf
-find . | grep -E "(.pytest_cache)" | xargs rm -rf
-exit 0

@@ -1,5 +1,6 @@
 numpy
 scipy
+sklearn
 filelock
 mpi4py
-pandas
+pandas >= 0.24.0

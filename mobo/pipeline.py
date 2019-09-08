@@ -1,197 +1,166 @@
+from mobo.cluster import BaseClusterer
+from mobo.data import OptimizationData
+from mobo.error import BaseErrorCalculator
+from mobo.filter import BaseFilterSet
+from mobo.log import Logger
+from mobo.manifold import BaseManifoldEmbedder
 from mobo.parameter import Parameter
 from mobo.qoi import QoI
-from mobo.log import Logger
 from mobo.sample import BaseSampler
-from mobo.filter import BaseFilterSet
-from mobo.error import BaseErrorCalculator
-from mobo.data import OptimizationData
+from mobo.scale import BaseScaler
 from mpi4py import MPI
 import numpy as np
-from datetime import datetime
+import os
+from typing import List, Optional
 
 
 class Pipeline(object):
-    """Implementation of an optimization pipeline.
+    """An optimization pipeline.
     
     Args:
-        parameters (iterable of Parameter): Parameters to optimize.
-        qois (iterable of QoI): Quantities of interest to evaluate.
-        segments (iterable of PipelineSegment): Segments to connect.
-        logger (optional) (Logger): Centralized file logger.
-        mpi_comm (optional) (mpi4py.MPI.COMM_WORLD): MPI communication object.
+        parameters: Parameters to optimize.
+        qois: Quantities of Interest to calculate.
+        segments: Pipeline segments involved in the process.
+        data_path_in: Path to a data file to start with.
+        data_path_out: Path to a directory to write results in.
+        logger: Central log file.
+
+    Attributes:
+        parameters: Parameters to optimize.
+        qois: Quantities of Interest to calculate.
+        segments: Pipeline segments involved in the process.
+        data_path_in: Path to a data file to start with.
+        data_path_out: Path to a directory to write results in.
+        logger: Central log file.
+        mpi: MPI COMM_WORLD object.
     """
-    
-    def __init__(self, parameters, qois, segments, logger=None, mpi_comm=None):
-        for p in parameters:
-            assert isinstance(p, Parameter)
-        for q in qois:
-            assert isinstance(q, QoI)
-        for s in segments:
-            assert type(s) is PipelineSegment
-        assert type(logger) in [Logger, type(None)]
-        assert type(mpi_comm) in [MPI.COMM_WORLD, type(None)]
-        self._parameters = parameters
-        self._qois = qois
-        self._segments = segments
-        self._logger = logger
-        self._mpi_comm = mpi_comm
+    def __init__(self,
+                 parameters: List[Parameter],
+                 qois: List[QoI],
+                 segments: List[PipelineSegment],
+                 data_path_in: Optional[str] = None,
+                 data_path_out: Optional[str] = None,
+                 logger: Optional[Logger] = None) -> None:
+        self.parameters = parameters
+        self.qois = qois
+        self.segments = segments
+        self.data_path_in = data_path_in
+        self.data_path_out = data_path_out
+        self.logger = logger
+        self.mpi = MPI.COMM_WORLD
 
-    @property
-    def parameters(self):
-        return self._parameters
-    
-    @property
-    def qois(self):
-        return self._qois
+    def execute(self) -> None:
+        self._log("Executing pipeline...")
+        n_segments = len(self.segments)
+        if self.data_path_in is None:
+            data = None
+        else:
+            data = OptimizationData.from_file(self.data_path_in)
+        for i, segment in enumerate(self.segments):
+            segment.data = data
+            segment.logger = self.logger
+            segment.mpi = self.mpi
+            self._log("Executing segment {} of {}...".format(
+                i + 1, n_segments))
+            self._log("Drawing samples...")
+            segment.sample()
+            if segment.clusterer is not None:
+                if segment.pre_cluster_scaler is not None:
+                    self._log("Scaling parameters...")
+                    segment.pre_cluster_scale()
+                if segment.manifold_embedder is not None:
+                    self._log("Manifold embedding parameters...")
+                    segment.embed()
+                self._log("Clustering parameters...")
+                segment.cluster()
+            self._log("Evaluating parameters...")
+            segment.evaluate()
+            if segment.pre_filter_scaler is not None:
+                self._log("Scaling errors...")
+                segment.pre_filter_scale()
+            self._log("Filtering results...")
+            segment.filter()
+            data = segment.data
+            if self.data_path_out is not None:
+                self._log("Writing results to file...")
+                path = os.path.join(self.data_path_out,
+                                    "results_{}.mobo".format(i))
+                data.to_file(path)
 
-    @property
-    def segments(self):
-        return self._segments
-
-    @property
-    def logger(self):
-        return self._logger
-
-    @property
-    def mpi_comm(self):
-        return self._mpi_comm
-
-    # TODO
-    def execute(self):
-        """Executes the optimization process."""
-        self._log("Beginning the optimization process...")
-        for i, s in enumerate(self.segments):
-            start_time = datetime.now()
-            self._log("Starting segment number {}...".format(i))
-            s.qois = self.qois
-            s.parameters = self.parameters
-            res = s.execute()  # TODO
-            end_time = datetime.now()
-            seconds = (end_time - start_time).total_seconds()
-            msg = ("Completed segment number {} in {} seconds."
-                   .format(i, seconds))
-            self._log(msg)
-
-    def _log(self, msg):
-        if self.logger is not None:
-            self.logger.log(msg)
+    def _log(self, msg: str) -> None:
+        if self.mpi.rank == 0:
+            if self.logger is None:
+                print(msg)
+            else:
+                self.logger.log(msg)
 
 
 class PipelineSegment(object):
-    """Implementation of a segment of an optimization pipeline.
+    """A segment of the optimization pipeline.
     
     Args:
-        sampler (instance of BaseSampler): Sampler to draw samples with.
-        filter_set (instance of BaseFilterSet): Filters to apply.
-        err_calc (instance of BaseErrorCalculator): The error calculator to use.
-        n_samples (int): Number of samples to draw.
-        logger (optional) (Logger): Centralized file logger.
+        error_calculator
+        filter_set
+        n_samples
+        sampler
+        clusterer
+        manifold_embedder
+        pre_cluster_scaler
+        pre_filter_scaler
 
     Attributes:
-        parameters (iterable of Parameter): Parameters to optimize.
-        qois (iterable of QoI): Quantities of interest to evaluate.
-        prior (numpy.ndarray): Data from a prior segment.
+        data
+        logger
+        mpi
     """
-    
-    def __init__(self, sampler, filter_set, err_calc, n_samples, logger=None):
-        assert isinstance(sampler, BaseSampler)
-        assert isinstance(filter_set, BaseFilterSet)
-        assert isinstance(err_calc, BaseErrorCalculator)
-        assert type(n_samples) is int
-        assert type(logger) in [Logger, type(None)]
-        self._sampler = sampler
-        self._filter_set = filter_set
-        self._err_calc = err_calc
-        self._n_samples = n_samples
-        self._logger = logger
+    def __init__(self,
+                 error_calculator: BaseErrorCalculator,
+                 filter_set: BaseFilterSet,
+                 n_samples: int,
+                 sampler: BaseSampler,
+                 clusterer: Optional[BaseClusterer] = None,
+                 manifold_embedder: Optional[BaseManifoldEmbedder] = None,
+                 pre_cluster_scaler: Optional[BaseScaler] = None,
+                 pre_filter_scaler: Optional[BaseScaler] = None) -> None:
+        self.error_calculator = error_calculator
+        self.filter_set = filter_set
+        self.n_samples = n_samples
+        self.sampler = sampler
+        self.clusterer = clusterer
+        self.manifold_embedder = manifold_embedder
+        self.pre_cluster_scaler = pre_cluster_scaler
+        self.pre_filter_scaler = pre_filter_scaler
+        self.data: Optional[OptimizationData] = None
+        self.logger: Optional[Logger] = None
+        self.mpi: Optional[MPI.COMM_WORLD] = None
 
-        # set by the pipeline
-        self._parameters = None
-        self._qois = None
-        self._prior = None
+    def sample(self):
+        pass
 
-    @property
-    def sampler(self):
-        return self._sampler
+    def pre_cluster_scale(self):
+        pass
 
-    @property
-    def filter_set(self):
-        return self._filter_set
+    def embed(self):
+        pass
 
-    @property
-    def err_calc(self):
-        return self._err_calc
+    def cluster(self):
+        pass
 
-    @property
-    def n_samples(self):
-        return self._n_samples
+    def evaluate(self):
+        pass
 
-    @property
-    def logger(self):
-        return self._logger
+    def pre_filter_scale(self):
+        pass
 
-    # settable attributes
+    def filter(self):
+        pass
 
-    @property
-    def parameters(self):
-        return self._parameters
+    def _scale(self):
+        pass
 
-    @parameters.setter
-    def parameters(self, value):
-        for v in value:
-            assert type(v) is Parameter
-        self._parameters = value
-
-    @property
-    def qois(self):
-        return self._qois
-
-    @qois.setter
-    def qois(self, value):
-        for v in value:
-            assert type(v) is QoI
-        self._qois = value
-
-    @property
-    def prior(self):
-        return self._prior
-
-    @prior.setter
-    def prior(self, value):
-        assert type(value) is np.ndarray
-        self._prior = value
-
-    # TODO
-    def execute(self):
-        """Execute this segment of the optimization process."""
-        
-        if self.prior is None:
-            self._log("Drawing samples without a prior distribution...")
-        else:
-            self._log("Drawing samples from a prior distribution...")
-            self.sampler.from_prior(self.prior)
-
-        samples = self.sampler.draw(self.n_samples)
-
-        self._log("Evaluating the parameterizations...")
-        
-        if self.qois is None:
-            err = "`self.qois` must be set before parameter evaluation."
-            raise ValueError(err)
-        
-        for q in self.qois:
-            msg = "Evaluating {} for all parameterizations...".format(q.name)
-            self._log(msg)
-            for s in samples:
-                prediction = q.evaluator(s)
-                print(q.name, prediction)
-
-        # draw samples
-        # (possibly from prior)
-        # calculate error
-        # (normalize)
-        # filter results
-    
-    def _log(self, msg):
-        if self.logger is not None:
-            self.logger.log(msg)
+    def _log(self, msg: str) -> None:
+        if self.mpi.rank == 0:
+            if self.logger is None:
+                print(msg)
+            else:
+                self.logger.log(msg)
