@@ -6,7 +6,7 @@ from typing import Callable, Optional, Union
 
 class BaseClusterer(object):
     """Abstract base class for Clusterers."""
-    def cluster(self, data: OptimizationData):
+    def cluster(self, data: np.ndarray):
         raise NotImplementedError()
 
 
@@ -37,13 +37,13 @@ class DbscanClusterer(BaseClusterer):
                              p=p,
                              n_jobs=None)
 
-    def cluster(self, data: OptimizationData) -> np.ndarray:
+    def cluster(self, data: np.ndarray) -> np.ndarray:
         """Clusters the dataset with the DBSCAN algorithm.
         
         Args:
-            data: Optimization data to cluster.
+            data: Data to cluster.
         """
-        return self.dbscan.fit_predict(data.parameter_values)
+        return self.dbscan.fit_predict(data)
 
 
 class KmeansClusterer(BaseClusterer):
@@ -79,10 +79,10 @@ class KmeansClusterer(BaseClusterer):
                              algorithm=algorithm,
                              n_jobs=None)
 
-    def cluster(self, data: OptimizationData) -> np.ndarray:
+    def cluster(self, data: np.ndarray) -> np.ndarray:
         """Clusters the dataset with the KMeans algorithm.
         
         Args:
-            data: Optimization data to cluster.
+            data: Data to cluster.
         """
-        return self.kmeans.fit_predict(data.parameter_values)
+        return self.kmeans.fit_predict(data)
