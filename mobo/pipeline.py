@@ -1,3 +1,4 @@
+import math
 from mobo.cluster import BaseClusterer
 from mobo.data import OptimizationData
 from mobo.error import BaseErrorCalculator
@@ -16,7 +17,7 @@ from typing import List, Optional
 
 class Pipeline(object):
     """An optimization pipeline.
-    
+
     Args:
         parameters: Parameters to optimize.
         qois: Quantities of Interest to calculate.
@@ -79,6 +80,7 @@ class Pipeline(object):
                 self._log("Scaling errors...")
                 segment.pre_filter_scale()
             self._log("Filtering results...")
+            # TODO: append the data here
             segment.filter()
             data = segment.data
             if self.data_path_out is not None:
@@ -97,7 +99,7 @@ class Pipeline(object):
 
 class PipelineSegment(object):
     """A segment of the optimization pipeline.
-    
+
     Args:
         error_calculator
         filter_set
@@ -130,33 +132,47 @@ class PipelineSegment(object):
         self.manifold_embedder = manifold_embedder
         self.pre_cluster_scaler = pre_cluster_scaler
         self.pre_filter_scaler = pre_filter_scaler
-        self.data: Optional[OptimizationData] = None
-        self.logger: Optional[Logger] = None
-        self.mpi: Optional[MPI.COMM_WORLD] = None
+        self.data: Optional[OptimizationData] = None  # set by Pipeline
+        self.logger: Optional[Logger] = None          # set by Pipeline
+        self.mpi: Optional[MPI.COMM_WORLD] = None     # set by Pipeline
+    
+    def sample(self) -> np.ndarray:
+        return self.sampler.draw(self.n_samples)
 
-    def sample(self):
+    def pre_cluster_scale(self, data: np.ndarray) -> np.ndarray:
+        if self.pre_cluster_scaler is None:
+            err = "self.pre_cluster_scaler is not set."
+            raise ValueError(err)
+        else:
+            return self.pre_cluster_scaler.scale(data)
+
+    def embed(self, data: np.ndarray) -> np.ndarray:
+        if self.manifold_embedder is None:
+            err = "self.manifold_embedder is not set."
+            raise ValueError(err)
+        else:
+            return self.manifold_embedder.embed(data)            
+
+    def cluster(self, data: np.ndarray):
+        if self.clusterer is None:
+            err = "self.clusterer is not set."
+            raise ValueError(err)
+        else:
+            return self.clusterer.cluster(data)
+
+    # do the mpi stuff outside if possible
+    def evaluate(self, data: np.ndarray):
         pass
 
-    def pre_cluster_scale(self):
-        pass
-
-    def embed(self):
-        pass
-
-    def cluster(self):
-        pass
-
-    def evaluate(self):
-        pass
-
-    def pre_filter_scale(self):
-        pass
+    def pre_filter_scale(self, data: np.ndarray) -> np.ndarray:
+        if self.pre_filter_scaler is None:
+            err = "self.pre_filter_scaler is not set."
+            raise ValueError(err)
+        else:
+            return self.pre_filter_scaler.scale(data)
 
     def filter(self):
-        pass
-
-    def _scale(self):
-        pass
+        self.filter_set.apply(self.data)
 
     def _log(self, msg: str) -> None:
         if self.mpi.rank == 0:
@@ -164,3 +180,18 @@ class PipelineSegment(object):
                 print(msg)
             else:
                 self.logger.log(msg)
+
+    def _n_samples_per_rank(self) -> Tuple[int, int]:
+        """Determines the appropriate number of samples to process for each 
+           rank.
+
+        Notes:
+            If the number of samples is not divisible by the number of ranks,
+            the remainder is handled by rank 0. The first return value is rank0 
+            samples the second is that of all other ranks.
+        """
+        n_ranks = self.mpi.Get_size()
+        remainder = self.n_samples % n_ranks
+        samples = math.floor(self.n_samples / n_ranks)
+        rank_0_samples = remainder + samples
+        return (rank_0_samples, samples)
