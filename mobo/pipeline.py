@@ -12,7 +12,7 @@ from mobo.scale import BaseScaler
 from mpi4py import MPI
 import numpy as np
 import os
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 class Pipeline(object):
@@ -53,40 +53,92 @@ class Pipeline(object):
     def execute(self) -> None:
         self._log("Executing pipeline...")
         n_segments = len(self.segments)
+        # read data from file if provided
         if self.data_path_in is None:
             data = None
         else:
             data = OptimizationData.from_file(self.data_path_in)
+        # iterate over each segment in the pipeline
         for i, segment in enumerate(self.segments):
+            # pass the data, logger, and mpi objects to the segment
             segment.data = data
             segment.logger = self.logger
             segment.mpi = self.mpi
             self._log("Executing segment {} of {}...".format(
                 i + 1, n_segments))
+            # draw initial parameters
             self._log("Drawing samples...")
-            segment.sample()
+            parameters = segment.sample()
+            # initialize optional values
+            scaled_parameters: Optional[np.ndarray] = None
+            manifold_embedding: Optional[np.ndarray] = None
+            cluster_ids: Optional[np.ndarray] = None
+            scaled_errors: Optional[np.ndarray] = None
+            # check optional steps
             if segment.clusterer is not None:
+                # scale the parameters if desired
                 if segment.pre_cluster_scaler is not None:
                     self._log("Scaling parameters...")
-                    segment.pre_cluster_scale()
+                    scaled_parameters = segment.pre_cluster_scale(parameters)
+                # calculate manifold if desired
+                # manifold can be done over various data or not at all
+                # hierarchy is as follows:
+                #   1) Scaled parameters
+                #   2) Raw parameters
                 if segment.manifold_embedder is not None:
                     self._log("Manifold embedding parameters...")
-                    segment.embed()
+                    if scaled_parameters is None:
+                        manifold_embedding = segment.embed(parameters)
+                    else:
+                        manifold_embedding = segment.embed(scaled_parameters)
+                # clustering can be done over various datas or not at all
+                # hierarchy is as follows:
+                #   1) Manifold embedding
+                #   2) Scaled parameter values
+                #   3) Raw parameter values
                 self._log("Clustering parameters...")
-                segment.cluster()
+                if manifold_embedding is not None:
+                    cluster_ids = segment.clusterer.cluster(manifold_embedding)
+                elif scaled_parameters is not None:
+                    cluster_ids = segment.clusterer.cluster(scaled_parameters)
+                else:
+                    cluster_ids = segment.clusterer.cluster(parameters)
+            # Evaluate the QoIs based on raw parameter values
             self._log("Evaluating parameters...")
-            segment.evaluate()
+            qois = segment.evaluate(parameters)
+            # TODO: Calculate error between results and targets
+            # ??? not sure how to package targets
+            self._log("Calculating errors...")
+            #errors = segment.error_calculator.calculate()
+            # scale the errors if desired
             if segment.pre_filter_scaler is not None:
                 self._log("Scaling errors...")
-                segment.pre_filter_scale()
+                scaled_errors = segment.pre_filter_scale(errors)
             self._log("Filtering results...")
-            # TODO: append the data here
+            # concat the data for filtering
+            # catch possible data failure
+            if data is None:
+                err = "data is not set"
+                raise ValueError(err)
+            data.append(
+                iteration=i,
+                parameter_values=parameters,
+                qoi_values=qois,
+                error_values=errors,
+                cluster_id=cluster_ids,
+                manifold_values=manifold_embedding,
+                scaled_parameter_values=scaled_parameters,
+                scaled_error_values=scaled_errors
+            )
+            # TODO: filter needs to know if scaled errors should be used
             segment.filter()
+            # update the OptimizationData
             data = segment.data
+            # Optionally (recommended) write the iteration result to file 
             if self.data_path_out is not None:
                 self._log("Writing results to file...")
                 path = os.path.join(self.data_path_out,
-                                    "results_{}.mobo".format(i))
+                                    "results_{}.csv".format(i))
                 data.to_file(path)
 
     def _log(self, msg: str) -> None:
@@ -143,22 +195,19 @@ class PipelineSegment(object):
         if self.pre_cluster_scaler is None:
             err = "self.pre_cluster_scaler is not set."
             raise ValueError(err)
-        else:
-            return self.pre_cluster_scaler.scale(data)
+        return self.pre_cluster_scaler.scale(data)
 
     def embed(self, data: np.ndarray) -> np.ndarray:
         if self.manifold_embedder is None:
             err = "self.manifold_embedder is not set."
             raise ValueError(err)
-        else:
-            return self.manifold_embedder.embed(data)            
+        return self.manifold_embedder.embed(data)            
 
     def cluster(self, data: np.ndarray):
         if self.clusterer is None:
             err = "self.clusterer is not set."
             raise ValueError(err)
-        else:
-            return self.clusterer.cluster(data)
+        return self.clusterer.cluster(data)
 
     # do the mpi stuff outside if possible
     def evaluate(self, data: np.ndarray):
@@ -168,13 +217,19 @@ class PipelineSegment(object):
         if self.pre_filter_scaler is None:
             err = "self.pre_filter_scaler is not set."
             raise ValueError(err)
-        else:
-            return self.pre_filter_scaler.scale(data)
+        return self.pre_filter_scaler.scale(data)
 
-    def filter(self):
+    def filter(self) -> None:
+        if self.data is None:
+            err = "self.data is not set."
+            raise ValueError(err)
         self.filter_set.apply(self.data)
 
     def _log(self, msg: str) -> None:
+        # catch possible mpi faliure
+        if self.mpi is None:
+            err = "self.mpi is not set."
+            raise ValueError(err)
         if self.mpi.rank == 0:
             if self.logger is None:
                 print(msg)
@@ -190,6 +245,10 @@ class PipelineSegment(object):
             the remainder is handled by rank 0. The first return value is rank0 
             samples the second is that of all other ranks.
         """
+        # catch possible mpi faliure
+        if self.mpi is None:
+            err = "self.mpi is not set."
+            raise ValueError(err)
         n_ranks = self.mpi.Get_size()
         remainder = self.n_samples % n_ranks
         samples = math.floor(self.n_samples / n_ranks)

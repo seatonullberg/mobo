@@ -38,11 +38,20 @@ class OptimizationData(object):
     @classmethod
     def from_file(cls, path: str):
         # TODO
+        # This needs to take parameters and qois as well
+        # ??? unless I also somehow include them in the file 
+        # ??? maybe zip file ???
         pass
 
     def to_file(self, path: str) -> None:
-        # TODO
-        pass
+        """Writes the underlying pandas.DataFrame to a CSV file.
+        
+        Args:
+            path: Path to the destination file.
+        """
+        # TODO: this should marshal the parameters and qois as well
+        # ??? possibly in a separate file then zip them ???
+        self._df.to_csv(path)
 
     def append(self,
                iteration: int,
