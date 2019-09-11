@@ -14,6 +14,8 @@ import numpy as np
 import os
 from typing import List, Optional, Tuple
 
+# TODO: Make a decorator to control serial operations
+# `with_rank_0`
 
 class Pipeline(object):
     """An optimization pipeline.
@@ -184,9 +186,9 @@ class PipelineSegment(object):
         self.manifold_embedder = manifold_embedder
         self.pre_cluster_scaler = pre_cluster_scaler
         self.pre_filter_scaler = pre_filter_scaler
-        self.data: Optional[OptimizationData] = None  # set by Pipeline
-        self.logger: Optional[Logger] = None          # set by Pipeline
-        self.mpi: Optional[MPI.COMM_WORLD] = None     # set by Pipeline
+        self._data: Optional[OptimizationData] = None  # set by Pipeline
+        self._logger: Optional[Logger] = None          # set by Pipeline
+        self._mpi: Optional[MPI.COMM_WORLD] = None     # set by Pipeline
     
     def sample(self) -> np.ndarray:
         return self.sampler.draw(self.n_samples)
@@ -203,14 +205,14 @@ class PipelineSegment(object):
             raise ValueError(err)
         return self.manifold_embedder.embed(data)            
 
-    def cluster(self, data: np.ndarray):
+    def cluster(self, data: np.ndarray) -> np.ndarray:
         if self.clusterer is None:
             err = "self.clusterer is not set."
             raise ValueError(err)
         return self.clusterer.cluster(data)
 
-    # do the mpi stuff outside if possible
-    def evaluate(self, data: np.ndarray):
+    # lots of mpi work to do
+    def evaluate(self, data: np.ndarray, qois: List[QoI]) -> np.ndarray:
         pass
 
     def pre_filter_scale(self, data: np.ndarray) -> np.ndarray:
@@ -220,16 +222,9 @@ class PipelineSegment(object):
         return self.pre_filter_scaler.scale(data)
 
     def filter(self) -> None:
-        if self.data is None:
-            err = "self.data is not set."
-            raise ValueError(err)
         self.filter_set.apply(self.data)
 
     def _log(self, msg: str) -> None:
-        # catch possible mpi faliure
-        if self.mpi is None:
-            err = "self.mpi is not set."
-            raise ValueError(err)
         if self.mpi.rank == 0:
             if self.logger is None:
                 print(msg)
@@ -243,14 +238,37 @@ class PipelineSegment(object):
         Notes:
             If the number of samples is not divisible by the number of ranks,
             the remainder is handled by rank 0. The first return value is rank0 
-            samples the second is that of all other ranks.
+            samples the second is that of all other ranks. Maybe not the best
+            algorithm, but hey, I'm not a CS student.
         """
-        # catch possible mpi faliure
-        if self.mpi is None:
-            err = "self.mpi is not set."
-            raise ValueError(err)
         n_ranks = self.mpi.Get_size()
         remainder = self.n_samples % n_ranks
         samples = math.floor(self.n_samples / n_ranks)
         rank_0_samples = remainder + samples
         return (rank_0_samples, samples)
+
+    # Things set by Pipeline are properties to prevent None check everywhere
+    # when there will actually be no chance of being None at runtime.
+    # Logger doesn't count because it is actually optional.
+
+    @property
+    def data(self) -> OptimizationData:
+        if self._data is None:
+            err = "self.data is not set."
+            raise ValueError(err)
+        return self._data
+
+    @data.setter
+    def data(self, value: OptimizationData) -> None:
+        self._data = value
+
+    @property
+    def mpi(self) -> MPI.COMM_WORLD:
+        if self._mpi is None:
+            err = "self.mpi is not set."
+            raise ValueError(err)
+        return self._mpi
+
+    @mpi.setter
+    def mpi(self, value: MPI.COMM_WORLD) -> None:
+        self._mpi = value
