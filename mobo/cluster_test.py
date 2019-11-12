@@ -1,21 +1,17 @@
 from mobo.cluster import DbscanClusterer, KmeansClusterer
-from mobo.data import OptimizationData
-from mobo.parameter import Parameter
-from mobo.qoi import QoI
 import numpy as np
+
+NROWS = 1000
+DATA = np.random.normal(size=(NROWS, 3))
 
 
 def test_dbscan_clusterer():
-    nrows = 1000
-    data = np.random.normal(size=(nrows, 3))
     dbscan = DbscanClusterer()
-    cluster_ids = dbscan.cluster(data)
-    assert cluster_ids.shape == (nrows, )
+    cluster_ids = dbscan(DATA)
+    assert cluster_ids.shape == (NROWS, )
 
 
 def test_kmeans_clusterer():
-    nrows = 1000
-    data = np.random.normal(size=(nrows, 3))
     kmeans = KmeansClusterer()
-    cluster_ids = kmeans.cluster(data)
-    assert cluster_ids.shape == (nrows, )
+    cluster_ids = kmeans(DATA)
+    assert cluster_ids.shape == (NROWS, )

@@ -1,103 +1,47 @@
-from mobo.data import OptimizationData
+from abc import ABC
 import numpy as np
-from typing import Callable, List
+from scipy.stats import zscore
+from sklearn.preprocessing import normalize
 
 
-class BaseFilter(object):
+class BaseFilter(ABC):
     """Abstract base class for Filters."""
-    def apply(self, error):
-        raise NotImplementedError()
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        pass
 
 
 class ParetoFilter(BaseFilter):
     """Pareto optimality filter."""
-    def __init__(self):
-        super().__init__()
-
-    def apply(self, error: np.ndarray) -> np.ndarray:
-        """Returns a mask of pareto efficient points.
-
-        Args:
-            error: Array of error values.
-        """
-        mask = np.ones(error.shape[0], dtype=bool)
-        for i, err in enumerate(error):
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        mask = np.ones(data.shape[0], dtype=bool)
+        for i, err in enumerate(data):
             if mask[i]:
                 # keep points with a lower error
-                mask[mask] = np.any(error[mask] < err, axis=1)
+                mask[mask] = np.any(data[mask] < err, axis=1)
                 # and keep self
                 mask[i] = True
         return mask
 
 
 class PercentileFilter(BaseFilter):
-    """Percentile rank filter.
-
-    Args:
-        cost_function: Function to calculate costs.
-        percentile: The percentile rank to accept.
-    """
-    def __init__(self, cost_function: Callable, percentile: int) -> None:
-        self.cost_function = cost_function
-        self.percentile = percentile
-
-    def apply(self, error: np.ndarray) -> np.ndarray:
-        """Returns a mask of points ranking at or above the given percentile.
-
-        Args:
-            error: Array of error values.
-        """
-        costs = self.cost_function(error)
-        critical_value = np.percentile(costs, self.percentile)
-        return np.array([c <= critical_value for c in costs])
+    """Percentile scoring filter."""
+    def __init__(self, percentile: int = 95) -> None:
+        self._percentile = percentile
+    
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        normalized = np.absolute(normalize(data, axis=0))
+        scores = np.sum(normalized, axis=1) # sum each row
+        critical_score = np.percentile(scores, self._percentile)
+        return np.array([s <= critical_score for s in scores])
 
 
-class BaseFilterSet(object):
-    """Abstract base class for FilterSets."""
-    def apply(self, data):
-        raise NotImplementedError()
+class ZscoreFilter(BaseFilter):
+    """Z-Score filter."""
+    def __init__(self, z: float = -1.5) -> None:
+        self._z = z
 
-
-# TODO: Implement with OptimizationData
-
-
-class IntersectionalFilterSet(BaseFilterSet):
-    """Filter set which applies all filters simultaneously.
-
-    Args:
-        filters: Filters to apply.
-    """
-    def __init__(self, filters: List[BaseFilter]) -> None:
-        self.filters = filters
-
-    def apply(self, data: OptimizationData) -> None:
-        """Applies all filters simultaneously.
-
-        Args:
-            data: OptimizationData.
-        """
-        masks = [f.apply(data.error_values) for f in self.filters]
-        result_mask = masks[0]
-        for mask in masks[1:]:
-            result_mask = np.logical_and(result_mask, mask)
-        data.drop(np.where(result_mask)[0])
-
-
-class SequentialFilterSet(BaseFilterSet):
-    """Filter set which applies all filters in sequence.
-
-    Args:
-        filters: Filters to apply.
-    """
-    def __init__(self, filters: List[BaseFilter]) -> None:
-        self.filters = filters
-
-    def apply(self, data: OptimizationData) -> None:
-        """Applies all filters in sequence.
-
-        Args:
-            data: OptimizationData.
-        """
-        for f in self.filters:
-            mask = f.apply(data.error_values)
-            data.drop(np.where(mask)[0])
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        normalized = np.absolute(normalize(data, axis=0))
+        scores = np.sum(normalized, axis=1) # sum each row
+        z_values = zscore(scores)
+        return np.array([z >= self._z for z in z_values])

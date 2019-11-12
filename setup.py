@@ -1,11 +1,17 @@
-from setuptools import setup
+import setuptools
 
-setup(name='mobo',
-      version='0.1.0',
-      description='Multiple Objective Optimization',
-      url='https://github.com/seatonullberg/mobo',
-      author='Seaton Ullberg',
-      author_email='seatonullberg@gmail.com',
-      license='BSD 2-Clause License',
-      packages=['mobo',],
-      zip_safe=True)
+with open("README.md", "r") as f:
+      long_description = f.read()
+
+setuptools.setup(
+      name="mobo",
+      version="0.1.0",
+      author="Seaton Ullberg",
+      author_email="sullberg@ufl.edu",
+      description="A rational and extensible algorithm for solving multi-objective optimization problems",
+      long_description=long_description,
+      long_description_content_type="text/markdown",
+      url="https://github.com/seatonullberg/mobo",
+      packages=setuptools.find_packages(),
+      license="BSD 2-Clause License"
+)
