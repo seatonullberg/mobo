@@ -2,5 +2,4 @@ numpy
 scipy
 sklearn
 filelock
-mpi4py
 pandas >= 0.24.0

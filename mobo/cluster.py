@@ -1,13 +1,16 @@
-from mobo.data import OptimizationData
+from abc import ABC
 import numpy as np
 from sklearn.cluster import DBSCAN, KMeans
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 
-class BaseClusterer(object):
+class BaseClusterer(ABC):
     """Abstract base class for Clusterers."""
-    def cluster(self, data: np.ndarray):
-        raise NotImplementedError()
+    def __init__(self, clusterer: Any) -> None:
+        self._clusterer = clusterer
+
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        pass
 
 
 class DbscanClusterer(BaseClusterer):
@@ -28,22 +31,18 @@ class DbscanClusterer(BaseClusterer):
                  algorithm: str = "auto",
                  leaf_size: int = 30,
                  p: Optional[float] = None) -> None:
-        self.dbscan = DBSCAN(eps=eps,
-                             min_samples=min_samples,
-                             metric=metric,
-                             metric_params=metric_params,
-                             algorithm=algorithm,
-                             leaf_size=leaf_size,
-                             p=p,
-                             n_jobs=None)
+        clusterer = DBSCAN(eps=eps,
+                           min_samples=min_samples,
+                           metric=metric,
+                           metric_params=metric_params,
+                           algorithm=algorithm,
+                           leaf_size=leaf_size,
+                           p=p,
+                           n_jobs=None)
+        super().__init__(clusterer)
 
-    def cluster(self, data: np.ndarray) -> np.ndarray:
-        """Clusters the dataset with the DBSCAN algorithm.
-        
-        Args:
-            data: Data to cluster.
-        """
-        return self.dbscan.fit_predict(data)
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        return self._clusterer.fit_predict(data)
 
 
 class KmeansClusterer(BaseClusterer):
@@ -67,22 +66,18 @@ class KmeansClusterer(BaseClusterer):
                  random_state: Union[int, None] = None,
                  copy_x: bool = True,
                  algorithm: str = "auto") -> None:
-        self.kmeans = KMeans(n_clusters=n_clusters,
-                             init=init,
-                             n_init=n_init,
-                             max_iter=max_iter,
-                             tol=tol,
-                             precompute_distances=precompute_distances,
-                             verbose=verbose,
-                             random_state=random_state,
-                             copy_x=copy_x,
-                             algorithm=algorithm,
-                             n_jobs=None)
+        clusterer = KMeans(n_clusters=n_clusters,
+                           init=init,
+                           n_init=n_init,
+                           max_iter=max_iter,
+                           tol=tol,
+                           precompute_distances=precompute_distances,
+                           verbose=verbose,
+                           random_state=random_state,
+                           copy_x=copy_x,
+                           algorithm=algorithm,
+                           n_jobs=None)
+        super().__init__(clusterer)
 
-    def cluster(self, data: np.ndarray) -> np.ndarray:
-        """Clusters the dataset with the KMeans algorithm.
-        
-        Args:
-            data: Data to cluster.
-        """
-        return self.kmeans.fit_predict(data)
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        return self._clusterer.fit_predict(data)

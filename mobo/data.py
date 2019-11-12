@@ -39,7 +39,7 @@ class OptimizationData(object):
     def from_file(cls, path: str):
         # TODO
         # This needs to take parameters and qois as well
-        # ??? unless I also somehow include them in the file 
+        # ??? unless I also somehow include them in the file
         # ??? maybe zip file ???
         pass
 

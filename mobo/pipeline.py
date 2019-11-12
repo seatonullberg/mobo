@@ -17,6 +17,7 @@ from typing import List, Optional, Tuple
 # TODO: Make a decorator to control serial operations
 # `with_rank_0`
 
+
 class Pipeline(object):
     """An optimization pipeline.
 
@@ -122,21 +123,19 @@ class Pipeline(object):
             if data is None:
                 err = "data is not set"
                 raise ValueError(err)
-            data.append(
-                iteration=i,
-                parameter_values=parameters,
-                qoi_values=qois,
-                error_values=errors,
-                cluster_id=cluster_ids,
-                manifold_values=manifold_embedding,
-                scaled_parameter_values=scaled_parameters,
-                scaled_error_values=scaled_errors
-            )
+            data.append(iteration=i,
+                        parameter_values=parameters,
+                        qoi_values=qois,
+                        error_values=errors,
+                        cluster_id=cluster_ids,
+                        manifold_values=manifold_embedding,
+                        scaled_parameter_values=scaled_parameters,
+                        scaled_error_values=scaled_errors)
             # TODO: filter needs to know if scaled errors should be used
             segment.filter()
             # update the OptimizationData
             data = segment.data
-            # Optionally (recommended) write the iteration result to file 
+            # Optionally (recommended) write the iteration result to file
             if self.data_path_out is not None:
                 self._log("Writing results to file...")
                 path = os.path.join(self.data_path_out,
@@ -187,9 +186,9 @@ class PipelineSegment(object):
         self.pre_cluster_scaler = pre_cluster_scaler
         self.pre_filter_scaler = pre_filter_scaler
         self._data: Optional[OptimizationData] = None  # set by Pipeline
-        self._logger: Optional[Logger] = None          # set by Pipeline
-        self._mpi: Optional[MPI.COMM_WORLD] = None     # set by Pipeline
-    
+        self._logger: Optional[Logger] = None  # set by Pipeline
+        self._mpi: Optional[MPI.COMM_WORLD] = None  # set by Pipeline
+
     def sample(self) -> np.ndarray:
         return self.sampler.draw(self.n_samples)
 
@@ -203,7 +202,7 @@ class PipelineSegment(object):
         if self.manifold_embedder is None:
             err = "self.manifold_embedder is not set."
             raise ValueError(err)
-        return self.manifold_embedder.embed(data)            
+        return self.manifold_embedder.embed(data)
 
     def cluster(self, data: np.ndarray) -> np.ndarray:
         if self.clusterer is None:
