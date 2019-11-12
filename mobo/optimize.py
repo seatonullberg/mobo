@@ -117,5 +117,5 @@ class Optimizer(object):
         """Generate a uniform distribution over the parameter bounds."""
         lows = np.array([p.lower_bound for p in self.configuration.parameters])
         highs = np.array([p.upper_bound for p in self.configuration.parameters])
-        return np.random.uniform(low=lows, high=highs, 
-                                 size=self.configuration.n_samples)
+        size = (self.configuration.n_samples, lows.shape[0])
+        return np.random.uniform(low=lows, high=highs, size=size)
