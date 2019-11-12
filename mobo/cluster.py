@@ -1,23 +1,17 @@
 from abc import ABC
 import numpy as np
 from sklearn.cluster import DBSCAN, KMeans
-from typing import Any, Callable, Optional, Union
+from typing import Callable, Optional, Union
 
 
 class BaseClusterer(ABC):
     """Abstract base class for Clusterers."""
-    def __init__(self, clusterer: Any) -> None:
-        self._clusterer = clusterer
-
     def __call__(self, data: np.ndarray) -> np.ndarray:
         pass
 
 
 class DbscanClusterer(BaseClusterer):
     """DBSCAN clustering technique.
-    
-    Notes:
-        `n_jobs` parameter is intentionally ignored to prevent MPI problems.
 
     Args:
         Reference:
@@ -31,15 +25,14 @@ class DbscanClusterer(BaseClusterer):
                  algorithm: str = "auto",
                  leaf_size: int = 30,
                  p: Optional[float] = None) -> None:
-        clusterer = DBSCAN(eps=eps,
-                           min_samples=min_samples,
-                           metric=metric,
-                           metric_params=metric_params,
-                           algorithm=algorithm,
-                           leaf_size=leaf_size,
-                           p=p,
-                           n_jobs=None)
-        super().__init__(clusterer)
+        self._clusterer = DBSCAN(eps=eps,
+                                 min_samples=min_samples,
+                                 metric=metric,
+                                 metric_params=metric_params,
+                                 algorithm=algorithm,
+                                 leaf_size=leaf_size,
+                                 p=p,
+                                 n_jobs=None)
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._clusterer.fit_predict(data)
@@ -47,9 +40,6 @@ class DbscanClusterer(BaseClusterer):
 
 class KmeansClusterer(BaseClusterer):
     """KMeans clustering technique.
-
-    Notes:
-        `n_jobs` parameter is intentionally ignored to prevent MPI problems.
     
     Args:
         Reference:
@@ -66,18 +56,17 @@ class KmeansClusterer(BaseClusterer):
                  random_state: Union[int, None] = None,
                  copy_x: bool = True,
                  algorithm: str = "auto") -> None:
-        clusterer = KMeans(n_clusters=n_clusters,
-                           init=init,
-                           n_init=n_init,
-                           max_iter=max_iter,
-                           tol=tol,
-                           precompute_distances=precompute_distances,
-                           verbose=verbose,
-                           random_state=random_state,
-                           copy_x=copy_x,
-                           algorithm=algorithm,
-                           n_jobs=None)
-        super().__init__(clusterer)
+        self._clusterer = KMeans(n_clusters=n_clusters,
+                                 init=init,
+                                 n_init=n_init,
+                                 max_iter=max_iter,
+                                 tol=tol,
+                                 precompute_distances=precompute_distances,
+                                 verbose=verbose,
+                                 random_state=random_state,
+                                 copy_x=copy_x,
+                                 algorithm=algorithm,
+                                 n_jobs=None)
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._clusterer.fit_predict(data)

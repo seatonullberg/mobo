@@ -2,15 +2,12 @@ from abc import ABC
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS, TSNE
-from typing import Any, Callable, Optional, Union
+from typing import Callable, Optional, Union
 
 
 class BaseProjector(ABC):
     """Abstract base class for Projectors."""
-    def __init__(self, projector: Any) -> None:
-        self._projector = projector
-
-    def __call__(self, data: np.ndarray) -> np.ndarray:
+    def __call__(self, data: np.ndarray) -> np.ndarray: 
         pass
 
 
@@ -29,16 +26,15 @@ class MDSProjector(BaseProjector):
                  eps: float = 1e-3,
                  random_state: Optional[int] = None,
                  dissimilarity: str = "euclidean") -> None:
-        projector = MDS(n_components=2,
-                        n_jobs=None,
-                        metric=metric,
-                        n_init=n_init,
-                        max_iter=max_iter,
-                        verbose=verbose,
-                        eps=eps,
-                        random_state=random_state,
-                        dissimilarity=dissimilarity)
-        super().__init__(projector)
+        self._projector = MDS(n_components=2,
+                              n_jobs=None,
+                              metric=metric,
+                              n_init=n_init,
+                              max_iter=max_iter,
+                              verbose=verbose,
+                              eps=eps,
+                              random_state=random_state,
+                              dissimilarity=dissimilarity)
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._projector.fit_transform(data)
@@ -57,13 +53,12 @@ class PCAProjector(BaseProjector):
                  tol: float = 0.0,
                  iterated_power: Union[str, int] = "auto",
                  random_state: Optional[int] = None) -> None:
-        projector = PCA(n_components=2,
-                        whiten=whiten,
-                        svd_solver=svd_solver,
-                        tol=tol,
-                        iterated_power=iterated_power,
-                        random_state=random_state)
-        super().__init__(projector)
+        self._projector = PCA(n_components=2,
+                              whiten=whiten,
+                              svd_solver=svd_solver,
+                              tol=tol,
+                              iterated_power=iterated_power,
+                              random_state=random_state)
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._projector.fit_transform(data)
@@ -89,20 +84,19 @@ class TSNEProjector(BaseProjector):
                  random_state: Optional[int] = None,
                  method: str = "barnes_hut",
                  angle: float = 0.5) -> None:
-        projector = TSNE(n_components=2,
-                         perplexity=perplexity,
-                         early_exaggeration=early_exaggeration,
-                         learning_rate=learning_rate,
-                         n_iter=n_iter,
-                         n_iter_without_progress=n_iter_without_progress,
-                         min_grad_norm=min_grad_norm,
-                         metric=metric,
-                         init=init,
-                         verbose=verbose,
-                         random_state=random_state,
-                         method=method,
-                         angle=angle)
-        super().__init__(projector)
+        self._projector = TSNE(n_components=2,
+                               perplexity=perplexity,
+                               early_exaggeration=early_exaggeration,
+                               learning_rate=learning_rate,
+                               n_iter=n_iter,
+                               n_iter_without_progress=n_iter_without_progress,
+                               min_grad_norm=min_grad_norm,
+                               metric=metric,
+                               init=init,
+                               verbose=verbose,
+                               random_state=random_state,
+                               method=method,
+                               angle=angle)
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._projector.fit_transform(data)

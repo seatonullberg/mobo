@@ -1,4 +1,4 @@
-from mobo.projection import *
+from mobo.projection import MDSProjector, PCAProjector, TSNEProjector
 import numpy as np
 
 NROWS = 100

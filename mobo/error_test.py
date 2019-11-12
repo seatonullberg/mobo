@@ -1,4 +1,5 @@
-from mobo.error import *
+from mobo.error import AbsoluteErrorCalculator, LogCoshErrorCalculator
+from mobo.error import RawErrorCalculator, SquaredErrorCalculator
 import numpy as np
 
 A = np.random.normal(size=(1000, 3))

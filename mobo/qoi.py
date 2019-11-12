@@ -5,14 +5,17 @@ class QoI(object):
     """A quantity of interest to be evaluated during optimization.
     
     Notes:
-        - `evaluator` should expect a dict of parameter names, values.
+        - `evaluator` should expect a dict mapping parameter names to values.
 
     Args:
-        evaluator: Evaluation function. 
         name: Name of the qoi.
+        evaluator: Evaluation function. 
         target: Target value of the qoi.
     """
-    def __init__(self, evaluator: Callable, name: str, target: float) -> None:
-        self.evaluator = evaluator
+    def __init__(self, 
+                 name: str,
+                 evaluator: Callable, 
+                 target: float) -> None:
         self.name = name
+        self.evaluator = evaluator
         self.target = target

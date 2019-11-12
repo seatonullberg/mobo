@@ -1,4 +1,4 @@
-from mobo.cluster import *
+from mobo.cluster import DbscanClusterer, KmeansClusterer
 import numpy as np
 
 NROWS = 1000
