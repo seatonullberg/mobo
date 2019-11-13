@@ -65,7 +65,7 @@ As an aside, you may notice that this optimizer is a callable object. I use this
 
 ![polynomial fit results](./figures/polynomial.png)
 
-The black line is the target polynomial, the black dots are the points used as quantities of interest, and the green lines are the predictions as a result of running the `mobo` algorithm. As you can see, the fit is quite close. Other choices of points to evaluate should yield similar results so long as they are near the local extrema.
+The black line is the target polynomial, the black dots are the points used as quantities of interest, the blue lines are the predictions from cluster 0 and the red lines are predictions from cluster 1. As you can see, the fit is quite close. Other choices of points to evaluate should yield similar results so long as they are near the local extrema.
 
 ## Algorithm Description
 TODO

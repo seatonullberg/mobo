@@ -30,14 +30,24 @@ class Optimizer(object):
         # loop over each iteration
         for i in range(self.configuration.n_iterations):
             self._log("\nBeginning iteration {}...".format(i))
-            df = self._evaluate(df, i) # generate errors
-            df = self._filter(df, i)   # remove poor parameterizations
+            # do not resample the first iteration
+            if i == 0:
+                self._log("Skipped resampling step for the first iteration.")
+            else:
+                df = self._sample(df, i)
+            # evaluate the parameterizations
+            df = self._evaluate(df, i)
+            # filter out poor parameterization
+            df = self._filter(df, i)
+            # reset index for proper joining
             df = df.reset_index()
-            df = self._project(df, i)  # project parameters onto 2D
-            df = self._cluster(df, i)  # cluster projected parameters
-            df = self._export(df, i)   # write iteration data to file
-            df = self._sample(df, i)   # generate new parameter distribution
-            self._log("Completed iteration {}\n".format(i))
+            # project the filtered parameters onto a 2D space
+            df = self._project(df, i)
+            # cluster the projected parameter space
+            df = self._cluster(df, i)
+            # write the iteration data to file
+            df = self._export(df, i)
+            self._log("Completed iteration {}.\n".format(i))
 
     @property
     def parameter_names(self) -> List[str]:
@@ -65,6 +75,36 @@ class Optimizer(object):
             self.parameter_names + self.qoi_names + self.error_names +
             self.projection_names + self.cluster_names
         )
+
+    def _sample(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
+        """Resample the filtered distribution."""
+        self._log("Resampling parameter space via KDE...")
+        cluster_ids = set(df[self.cluster_names].to_numpy().flatten())
+        n_samples = self.configuration.local_configurations[iteration].n_samples
+        n_samples_per_cluster = n_samples // len(cluster_ids) # TODO
+        self._log(
+            "\tDrawing {} samples per cluster...".format(n_samples_per_cluster)
+        )
+        samples = []
+        for cluster_id in cluster_ids:
+            self._log("\tCluster {}:".format(cluster_id))
+            data = df[df[self.cluster_names[0]] == cluster_id] # another issue caused by single element list
+            self._log("\t\tsamples: {}".format(len(data)))
+            data_arr = data[self.parameter_names].to_numpy(float)
+            # i will never understand the double transpose
+            kde = gaussian_kde(data_arr.T)
+            self._log("\t\tbandwidth: {:.6}".format(kde.factor))
+            samples.append(kde.resample(n_samples_per_cluster).T)
+        new_samples_arr = np.vstack(samples) # concat new samples
+        old_samples_arr = df[self.parameter_names].to_numpy()
+        samples_arr = np.vstack((old_samples_arr, new_samples_arr)) # concat old samples
+        index = range(len(samples_arr))
+        df = pd.DataFrame(columns=self.df_column_names, index=index) # overwrite df
+        df.update(
+            {pn: samples_arr[:, i] for i, pn in enumerate(self.parameter_names)}
+        )
+        self._log("\tResampled data has {} samples.".format(len(df)))
+        return df
 
     def _evaluate(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Evaluate each qoi for each parameterization."""
@@ -106,7 +146,7 @@ class Optimizer(object):
 
     def _project(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Project parameter space down to a 2D space."""
-        self._log("Projecting parameter space to 2D...")
+        self._log("Projecting parameter space down to 2D...")
         proj = self.configuration.local_configurations[iteration].projector
         proj_arr = proj(df[self.parameter_names].to_numpy())
         df.update(
@@ -128,36 +168,8 @@ class Optimizer(object):
     def _export(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Export the results of an iteration as a csv file."""
         filename = "mobo_iteration_{}.csv".format(iteration)
-        self._log("Exporting iteration data to {}...".format(filename))
         df.to_csv(filename)
-        return df
-
-    def _sample(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
-        """Resample the filtered distribution."""
-        self._log("Resampling parameter space via KDE...")
-        cluster_ids = set(df[self.cluster_names].to_numpy().flatten())
-        n_samples = self.configuration.local_configurations[iteration].n_samples
-        n_samples_per_cluster = n_samples // len(cluster_ids) # TODO
-        self._log(
-            "\tDrawing {} samples per cluster...".format(n_samples_per_cluster)
-        )
-        samples = []
-        for cluster_id in cluster_ids:
-            data = df[df[self.cluster_names[0]] == cluster_id] # another issue caused by single element list
-            self._log("\tCluster {} has {} samples.".format(cluster_id, len(data)))
-            data_arr = data[self.parameter_names].to_numpy(float)
-            # i will never understand the double transpose
-            kde = gaussian_kde(data_arr.T)
-            samples.append(kde.resample(n_samples_per_cluster).T)
-        new_samples_arr = np.vstack(samples) # concat new samples
-        old_samples_arr = df[self.parameter_names].to_numpy()
-        samples_arr = np.vstack((old_samples_arr, new_samples_arr)) # concat old samples
-        index = range(len(samples_arr))
-        df = pd.DataFrame(columns=self.df_column_names, index=index) # overwrite df
-        df.update(
-            {pn: samples_arr[:, i] for i, pn in enumerate(self.parameter_names)}
-        )
-        self._log("\tResampled data has {} samples.".format(len(df)))
+        self._log("Exported iteration data to {}.".format(filename))
         return df
 
     def _generate_initial_parameter_distributions(self) -> np.ndarray:

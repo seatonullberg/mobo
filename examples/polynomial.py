@@ -95,9 +95,11 @@ if __name__ == "__main__":
     # construct plot
     fig, ax = plt.subplots()
     x = np.arange(-1.25, 4.25, 0.1)
-    for _, p in final_data[optimizer.parameter_names].iterrows():
+    colors = ["blue", "red"]
+    for i, p in final_data[optimizer.parameter_names].iterrows():
         y = [polynomial(p["a"], p["b"], p["c"], _x) for _x in x]
-        ax.plot(x, y, alpha=0.2, color="green", zorder=0)
+        cluster_id = final_data["cluster_id"][i]
+        ax.plot(x, y, alpha=0.2, color=colors[cluster_id], zorder=0)
     exact_y = [polynomial(0.3, -1.2, 0.5, _x) for _x in x]
     ax.plot(x, exact_y, color="black", zorder=1)
     test_x = [-0.1, 0.3, 2.0, 4.0]
