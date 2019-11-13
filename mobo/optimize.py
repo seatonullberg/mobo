@@ -2,7 +2,7 @@ from mobo.configuration import GlobalConfiguration
 import numpy as np
 import pandas as pd
 from scipy.stats import gaussian_kde
-from typing import List
+from typing import Dict, List
 
 
 class Optimizer(object):
@@ -18,19 +18,21 @@ class Optimizer(object):
         # initialize the dataframe
         path = self.configuration.initial_data_path
         if path is None:
-            df = pd.DataFrame(columns=self.df_column_names)
+            index = range(self.configuration.n_samples)
+            df = pd.DataFrame(columns=self.df_column_names, index=index)
             init_dist = self._generate_initial_parameter_distributions()
             df[self.parameter_names] = init_dist
         else:
             df = pd.read_csv(path)
         # loop over each iteration
         for i in range(self.configuration.n_iterations):
-            self._evaluate(df, i) # generate errors
-            self._filter(df, i)   # remove poor parameterizations
-            self._project(df, i)  # project parameters onto 2D
-            self._cluster(df, i)  # cluster projected parameters
-            self._export(df, i)   # write iteration data to file
-            self._sample(df, i)   # generate new parameter distribution
+            df = self._evaluate(df, i) # generate errors
+            df = self._filter(df, i)   # remove poor parameterizations
+            df = df.reset_index()
+            df = self._project(df, i)  # project parameters onto 2D
+            df = self._cluster(df, i)  # cluster projected parameters
+            df = self._export(df, i)   # write iteration data to file
+            df = self._sample(df, i)   # generate new parameter distribution
 
     @property
     def parameter_names(self) -> List[str]:
@@ -59,63 +61,90 @@ class Optimizer(object):
             self.projection_names + self.cluster_names
         )
 
-    def _evaluate(self, df: pd.DataFrame, iteration: int) -> None:
+    def _evaluate(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Evaluate each qoi for each parameterization."""
         err_calc = self.configuration.local_configurations[iteration].error_calculator
-        errors = []
-        for p in df[self.parameter_names]:
+        qoi_targets = np.array([
+            qoi.target for qoi in self.configuration.qois
+        ])
+        all_qoi_values: List[np.ndarray] = []
+        all_error_values: List[np.ndarray] = []
+        for _, parameterization in df[self.parameter_names].iterrows():
             qoi_values = np.array([
-                q.evaluator(p.to_dict()) for q in self.configuration.qois
+                qoi.evaluator(parameterization.to_dict()) 
+                for qoi in self.configuration.qois
             ])
-            qoi_targets = np.array([
-                q.target for q in self.configuration.qois
-            ])
-            errors.append(err_calc(actual=qoi_values, target=qoi_targets))
-        df[self.error_names] = errors
+            all_qoi_values.append(qoi_values)
+            error_values = err_calc(actual=qoi_values, target=qoi_targets)
+            all_error_values.append(error_values)
+        qoi_arr = np.array(all_qoi_values)
+        error_arr = np.array(all_error_values)
+        df.update(
+            {qn: qoi_arr[:, i] for i, qn in enumerate(self.qoi_names)}
+        )
+        df.update(
+            {en: error_arr[:, i] for i, en in enumerate(self.error_names)}
+        )
+        return df
 
-    def _filter(self, df: pd.DataFrame, iteration: int) -> None:
+    def _filter(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Filter out poor parameterizations."""
         filters = self.configuration.local_configurations[iteration].filters
         for f in filters:
-            mask = f(df[self.error_names])
+            mask = f(df[self.error_names].to_numpy())
             df = df[mask]
+        return df
 
-    def _project(self, df: pd.DataFrame, iteration: int) -> None:
+    def _project(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Project parameter space down to a 2D space."""
         proj = self.configuration.local_configurations[iteration].projector
-        projection = proj(df[self.parameter_names])
-        df[self.projection_names] = projection
+        proj_arr = proj(df[self.parameter_names].to_numpy())
+        df.update(
+            {pn: proj_arr[:, i] for i, pn in enumerate(self.projection_names)}
+        )
+        return df
 
-    def _cluster(self, df: pd.DataFrame, iteration: int) -> None:
+    def _cluster(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Assign cluster ids to projected parameters."""
         clust = self.configuration.local_configurations[iteration].clusterer
-        cluster_ids = clust(df[self.projection_names])
-        df[self.cluster_names] = cluster_ids
+        cluster_ids = clust(df[self.projection_names].to_numpy())
+        # this is an exception because cluster_names is really just on name
+        df.update(
+            {self.cluster_names[0]: cluster_ids}
+        )
+        return df
 
-    def _export(self, df: pd.DataFrame, iteration: int) -> None:
+    def _export(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Export the results of an iteration as a csv file."""
         filename = "mobo_iteration_{}.csv".format(iteration)
         df.to_csv(filename)
+        return df
 
-    def _sample(self, df: pd.DataFrame, iteration: int) -> None:
+    def _sample(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Resample the filtered distribution."""
-        cluster_ids = set(df[self.cluster_names])
+        cluster_ids = set(df[self.cluster_names].to_numpy().flatten())
         n_samples = self.configuration.local_configurations[iteration].n_samples
         n_samples_per_cluster = n_samples // len(cluster_ids) # TODO
         samples = []
         for cluster_id in cluster_ids:
-            data = df[self.parameter_names].where(df[self.cluster_names] == cluster_id)
-            kde = gaussian_kde(data)
+            data = df[df[self.cluster_names[0]] == cluster_id] # another issue caused by single element list
+            data_arr = data[self.parameter_names].to_numpy(float)
+            # i will never understand the double transpose
+            kde = gaussian_kde(data_arr.T)
             samples.append(kde.resample(n_samples_per_cluster).T)
-        samples = np.vstack(samples) # concat new samples
-        old_samples = df[self.parameter_names].to_numpy()
-        samples = np.vstack((samples, old_samples)) # concat old samples
-        df = pd.DataFrame(columns=self.df_column_names) # overwrite df
-        df[self.parameter_names] = samples
+        new_samples_arr = np.vstack(samples) # concat new samples
+        old_samples_arr = df[self.parameter_names].to_numpy()
+        samples_arr = np.vstack((old_samples_arr, new_samples_arr)) # concat old samples
+        index = range(len(samples_arr))
+        df = pd.DataFrame(columns=self.df_column_names, index=index) # overwrite df
+        df.update(
+            {pn: samples_arr[:, i] for i, pn in enumerate(self.parameter_names)}
+        )
+        return df
 
     def _generate_initial_parameter_distributions(self) -> np.ndarray:
         """Generate a uniform distribution over the parameter bounds."""
         lows = np.array([p.lower_bound for p in self.configuration.parameters])
         highs = np.array([p.upper_bound for p in self.configuration.parameters])
-        return np.random.uniform(low=lows, high=highs, 
-                                 size=self.configuration.n_samples)
+        size = (self.configuration.n_samples, lows.shape[0])
+        return np.random.uniform(low=lows, high=highs, size=size)
