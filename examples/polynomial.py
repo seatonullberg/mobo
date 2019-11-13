@@ -36,9 +36,9 @@ def evaluate_pt2(params):
 if __name__ == "__main__":
     # construct parameters
     parameters = [
-        Parameter("a", -1.0, 1.0), Parameter("b", -2.0, 2.0),
-        Parameter("c", 10.0, 20.0), Parameter("d", -20.0, -15.0),
-        Parameter("e", 0, 3)
+        Parameter("a", -1.0, 1.0), Parameter("b", -2.0, 0.0),
+        Parameter("c", 12.0, 16.0), Parameter("d", -20.0, -16.0),
+        Parameter("e", 1.0, 3.0)
     ]
     # construct qois
     qois = [
@@ -48,10 +48,10 @@ if __name__ == "__main__":
     ]
     # construct local configurations
     n_iterations = 5
-    n_samples = 1000
-    clusterer = KmeansClusterer()
+    n_samples = 20000
+    clusterer = KmeansClusterer(n_clusters=2)
     error_calculator = SquaredErrorCalculator()
-    filters = [PercentileFilter(), ParetoFilter()]
+    filters = [ParetoFilter(), PercentileFilter(99)]
     projector = PCAProjector()
     local_config = LocalConfiguration(n_samples,
                                       clusterer,
@@ -68,3 +68,4 @@ if __name__ == "__main__":
     # construct optimizer
     optimizer = Optimizer(global_config)
     optimizer() # begin optimization
+    # TODO: visualize results
