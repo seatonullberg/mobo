@@ -91,8 +91,18 @@ class Optimizer(object):
             data = df[df[self.cluster_names[0]] == cluster_id] # another issue caused by single element list
             self._log("\t\tsamples: {}".format(len(data)))
             data_arr = data[self.parameter_names].to_numpy(float)
-            # i will never understand the double transpose
-            kde = gaussian_kde(data_arr.T)
+            # linalg error when num samples is less than num parameters
+            try:
+                kde = gaussian_kde(data_arr.T)
+            except (np.linalg.LinAlgError, ValueError):
+                err = (
+                    "The number of samples in a cluster is less than the "
+                    "number of parameters. This causes the KDE kernel to fail. "
+                    "Try reducing the number of clusters, increasing the "
+                    "number of samples per iteration, or relaxing the filter "
+                    "constraints."
+                )
+                raise ValueError(err)
             self._log("\t\tbandwidth: {:.6}".format(kde.factor))
             samples.append(kde.resample(n_samples_per_cluster).T)
         new_samples_arr = np.vstack(samples) # concat new samples
