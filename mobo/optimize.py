@@ -2,7 +2,7 @@ from mobo.configuration import GlobalConfiguration
 import numpy as np
 import pandas as pd
 from scipy.stats import gaussian_kde
-from typing import Dict, List
+from typing import List
 
 
 class Optimizer(object):

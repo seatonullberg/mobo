@@ -92,10 +92,24 @@ if __name__ == "__main__":
     # load final data file
     final_data = pd.read_csv("mobo_iteration_4.csv")
 
-    # construct plot
+    colors = ["blue", "red"]
+
+    # construct clusters plot
+    fig, ax = plt.subplots()
+    for i, p in final_data[optimizer.projection_names].iterrows():
+        x = p[0]
+        y = p[1]
+        cluster_id = final_data["cluster_id"][i]
+        ax.scatter(x, y, color=colors[cluster_id], s=2)
+    ax.set_title("Clusters in Projected Parameter Space")
+    ax.set_xlabel("PCA 0")
+    ax.set_ylabel("PCA 1")
+    fig.tight_layout()
+    fig.savefig("polynomial_clusters.png")
+
+    # construct predictions plot
     fig, ax = plt.subplots()
     x = np.arange(-1.25, 4.25, 0.1)
-    colors = ["blue", "red"]
     for i, p in final_data[optimizer.parameter_names].iterrows():
         y = [polynomial(p["a"], p["b"], p["c"], _x) for _x in x]
         cluster_id = final_data["cluster_id"][i]
@@ -107,5 +121,5 @@ if __name__ == "__main__":
     ax.scatter(test_x, test_y, color="black", zorder=2)
     ax.set_ylim(-4, 4)
     ax.set_title(r"$y = 0.3x^3 - 1.2x^2 + 0.5x$")
-    plt.tight_layout()
-    plt.savefig("polynomial.png")
+    fig.tight_layout()
+    fig.savefig("polynomial_predictions.png")
