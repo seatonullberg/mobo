@@ -60,3 +60,4 @@ class GlobalConfiguration(object):
         self.parameters = parameters
         self.qois = qois
         self.initial_data_path = initial_data_path
+        self.logger = logger

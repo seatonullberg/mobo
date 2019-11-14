@@ -2,7 +2,7 @@ from mobo.configuration import GlobalConfiguration
 import numpy as np
 import pandas as pd
 from scipy.stats import gaussian_kde
-from typing import Dict, List
+from typing import List
 
 
 class Optimizer(object):
@@ -15,24 +15,39 @@ class Optimizer(object):
         self.configuration = configuration
 
     def __call__(self) -> None:
+        self._log("Beginning the optimization process...")
         # initialize the dataframe
         path = self.configuration.initial_data_path
         if path is None:
+            self._log("Generating initial parameter distributions...")
             index = range(self.configuration.n_samples)
             df = pd.DataFrame(columns=self.df_column_names, index=index)
             init_dist = self._generate_initial_parameter_distributions()
             df[self.parameter_names] = init_dist
         else:
+            self._log("Reading initial parameter distributions from file...")
             df = pd.read_csv(path)
         # loop over each iteration
         for i in range(self.configuration.n_iterations):
-            df = self._evaluate(df, i) # generate errors
-            df = self._filter(df, i)   # remove poor parameterizations
+            self._log("\nBeginning iteration {}...".format(i))
+            # do not resample the first iteration
+            if i == 0:
+                self._log("Skipped resampling step for the first iteration.")
+            else:
+                df = self._sample(df, i)
+            # evaluate the parameterizations
+            df = self._evaluate(df, i)
+            # filter out poor parameterization
+            df = self._filter(df, i)
+            # reset index for proper joining
             df = df.reset_index()
-            df = self._project(df, i)  # project parameters onto 2D
-            df = self._cluster(df, i)  # cluster projected parameters
-            df = self._export(df, i)   # write iteration data to file
-            df = self._sample(df, i)   # generate new parameter distribution
+            # project the filtered parameters onto a 2D space
+            df = self._project(df, i)
+            # cluster the projected parameter space
+            df = self._cluster(df, i)
+            # write the iteration data to file
+            df = self._export(df, i)
+            self._log("Completed iteration {}.\n".format(i))
 
     @property
     def parameter_names(self) -> List[str]:
@@ -61,8 +76,49 @@ class Optimizer(object):
             self.projection_names + self.cluster_names
         )
 
+    def _sample(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
+        """Resample the filtered distribution."""
+        self._log("Resampling parameter space via KDE...")
+        cluster_ids = set(df[self.cluster_names].to_numpy().flatten())
+        n_samples = self.configuration.local_configurations[iteration].n_samples
+        n_samples_per_cluster = n_samples // len(cluster_ids) # TODO
+        self._log(
+            "\tDrawing {} samples per cluster...".format(n_samples_per_cluster)
+        )
+        samples = []
+        for cluster_id in cluster_ids:
+            self._log("\tCluster {}:".format(cluster_id))
+            data = df[df[self.cluster_names[0]] == cluster_id] # another issue caused by single element list
+            self._log("\t\tsamples: {}".format(len(data)))
+            data_arr = data[self.parameter_names].to_numpy(float)
+            # linalg error when num samples is less than num parameters
+            try:
+                kde = gaussian_kde(data_arr.T)
+            except (np.linalg.LinAlgError, ValueError):
+                err = (
+                    "The number of samples in a cluster is less than the "
+                    "number of parameters. This causes the KDE kernel to fail. "
+                    "Try reducing the number of clusters, increasing the "
+                    "number of samples per iteration, or relaxing the filter "
+                    "constraints."
+                )
+                raise ValueError(err)
+            self._log("\t\tbandwidth: {:.6}".format(kde.factor))
+            samples.append(kde.resample(n_samples_per_cluster).T)
+        new_samples_arr = np.vstack(samples) # concat new samples
+        old_samples_arr = df[self.parameter_names].to_numpy()
+        samples_arr = np.vstack((old_samples_arr, new_samples_arr)) # concat old samples
+        index = range(len(samples_arr))
+        df = pd.DataFrame(columns=self.df_column_names, index=index) # overwrite df
+        df.update(
+            {pn: samples_arr[:, i] for i, pn in enumerate(self.parameter_names)}
+        )
+        self._log("\tResampled data has {} samples.".format(len(df)))
+        return df
+
     def _evaluate(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Evaluate each qoi for each parameterization."""
+        self._log("Evaluating parameterizations...")
         err_calc = self.configuration.local_configurations[iteration].error_calculator
         qoi_targets = np.array([
             qoi.target for qoi in self.configuration.qois
@@ -89,14 +145,18 @@ class Optimizer(object):
 
     def _filter(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Filter out poor parameterizations."""
+        self._log("Filtering parameterizations...")
+        self._log("\tSamples before filtration: {}".format(len(df)))
         filters = self.configuration.local_configurations[iteration].filters
         for f in filters:
             mask = f(df[self.error_names].to_numpy())
             df = df[mask]
+        self._log("\tSamples after filtration: {}".format(len(df)))
         return df
 
     def _project(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Project parameter space down to a 2D space."""
+        self._log("Projecting parameter space down to 2D...")
         proj = self.configuration.local_configurations[iteration].projector
         proj_arr = proj(df[self.parameter_names].to_numpy())
         df.update(
@@ -106,6 +166,7 @@ class Optimizer(object):
 
     def _cluster(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
         """Assign cluster ids to projected parameters."""
+        self._log("Clustering projected parameter space...")
         clust = self.configuration.local_configurations[iteration].clusterer
         cluster_ids = clust(df[self.projection_names].to_numpy())
         # this is an exception because cluster_names is really just on name
@@ -118,28 +179,7 @@ class Optimizer(object):
         """Export the results of an iteration as a csv file."""
         filename = "mobo_iteration_{}.csv".format(iteration)
         df.to_csv(filename)
-        return df
-
-    def _sample(self, df: pd.DataFrame, iteration: int) -> pd.DataFrame:
-        """Resample the filtered distribution."""
-        cluster_ids = set(df[self.cluster_names].to_numpy().flatten())
-        n_samples = self.configuration.local_configurations[iteration].n_samples
-        n_samples_per_cluster = n_samples // len(cluster_ids) # TODO
-        samples = []
-        for cluster_id in cluster_ids:
-            data = df[df[self.cluster_names[0]] == cluster_id] # another issue caused by single element list
-            data_arr = data[self.parameter_names].to_numpy(float)
-            # i will never understand the double transpose
-            kde = gaussian_kde(data_arr.T)
-            samples.append(kde.resample(n_samples_per_cluster).T)
-        new_samples_arr = np.vstack(samples) # concat new samples
-        old_samples_arr = df[self.parameter_names].to_numpy()
-        samples_arr = np.vstack((old_samples_arr, new_samples_arr)) # concat old samples
-        index = range(len(samples_arr))
-        df = pd.DataFrame(columns=self.df_column_names, index=index) # overwrite df
-        df.update(
-            {pn: samples_arr[:, i] for i, pn in enumerate(self.parameter_names)}
-        )
+        self._log("Exported iteration data to {}.".format(filename))
         return df
 
     def _generate_initial_parameter_distributions(self) -> np.ndarray:
@@ -148,3 +188,11 @@ class Optimizer(object):
         highs = np.array([p.upper_bound for p in self.configuration.parameters])
         size = (self.configuration.n_samples, lows.shape[0])
         return np.random.uniform(low=lows, high=highs, size=size)
+
+    def _log(self, msg: str) -> None:
+        """Log a message to file or stdout."""
+        logger = self.configuration.logger
+        if logger is None:
+            print(msg)
+        else:
+            logger.log(msg)

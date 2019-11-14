@@ -1,4 +1,6 @@
 # mobo
+
+## Introduction
 `mobo` is an algorithm to solve multi-objective problems without imposing the bias of weights. Rather than converging to a single 'optimal' solution, `mobo` produces an ensamble of rational solutions which may then be further downselected according to the constraints of a particular application.
 
 ## Installation
@@ -63,9 +65,13 @@ optimizer()
 ```
 As an aside, you may notice that this optimizer is a callable object. I use this theme in many objects which only expose publicly a single method. After optimization you will be left with some data files representing the results of each iteration. If you were to visualize the final results, you should see something like this.
 
-![polynomial fit results](./figures/polynomial.png)
+![polynomial fit results](./figures/polynomial_predictions.png)
 
-The black line is the target polynomial, the black dots are the points used as quantities of interest, and the green lines are the predictions as a result of running the `mobo` algorithm. As you can see, the fit is quite close. Other choices of points to evaluate should yield similar results so long as they are near the local extrema.
+The black line is the target polynomial, the black dots are the points used as quantities of interest, the blue lines are the predictions from cluster 0 and the red lines are predictions from cluster 1. As you can see, the fit is quite close. Other choices of points to evaluate should yield similar results so long as they are near the local extrema. The following plot attempts to illustrate some of the internal mechanics.
+
+![polynomial cluster results](./figures/polynomial_clusters.png)
+
+The points are parameters projected down onto their primary PCA vectors. Blue points correspond to parameterizations from cluster 0 and red from cluster 1. This view is essentially what the KDE sampler "sees" when it is selecting new parameterizations. This view helps to show why the parameters in different clusters are producing distinct predictions.
 
 ## Algorithm Description
 TODO
