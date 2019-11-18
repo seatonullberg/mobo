@@ -1,5 +1,4 @@
 from datetime import datetime
-import os
 
 
 class Logger(object):
@@ -17,8 +16,7 @@ class Logger(object):
         Args:
             msg: The message to write.
         """
-        with lock:
-            now = datetime.now()
-            msg = "{}\n{}\n\n".format(now, msg)
-            with open(self.path, "a") as f:
-                f.write(msg)
+        now = datetime.now()
+        msg = "{}\n{}\n\n".format(now, msg)
+        with open(self.path, "a") as f:
+            f.write(msg)

@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
       name="mobo",
-      version="0.1.0",
+      version="1.0.0",
       author="Seaton Ullberg",
       author_email="sullberg@ufl.edu",
       description="A rational and extensible algorithm for solving multi-objective optimization problems",

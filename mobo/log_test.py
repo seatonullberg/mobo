@@ -1,5 +1,4 @@
 from mobo.log import Logger
-from threading import Thread
 import os
 
 
