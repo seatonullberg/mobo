@@ -1,5 +1,4 @@
 from datetime import datetime
-from filelock import FileLock
 import os
 
 
@@ -18,10 +17,8 @@ class Logger(object):
         Args:
             msg: The message to write.
         """
-        lock = FileLock(self.path + ".lock")
         with lock:
             now = datetime.now()
             msg = "{}\n{}\n\n".format(now, msg)
             with open(self.path, "a") as f:
                 f.write(msg)
-        os.remove(self.path + ".lock")

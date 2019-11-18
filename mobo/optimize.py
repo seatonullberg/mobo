@@ -78,7 +78,7 @@ class Optimizer(object):
         return ["projection_0", "projection_1"]
 
     @property
-    def cluster_header(self) -> List[str]:
+    def cluster_header(self) -> str:
         return "cluster_id"
 
     @property
@@ -115,7 +115,7 @@ class Optimizer(object):
                 self._log(msg)
                 continue
             else:
-                self._log("\t\tbandwidth: {:.6}".format(kde.factor))
+                self._log("\t\tbandwidth: {:.6}".format(bandwidth))
                 samples.append(kde.resample(n_samples_per_cluster).T)
         samples_arr = np.vstack(samples)
         index = range(len(samples_arr))

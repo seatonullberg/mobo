@@ -53,10 +53,9 @@ if __name__ == "__main__":
 
     n_iterations = 6  # number of iterations to evolve through
     n_samples = 10000 # number of samples to draw at each iteration (could set different for each)
-    n_clusters = 2    # number of clusters to find at each iteration (could be set different for each)
 
     # construct local configurations
-    clusterer = KmeansClusterer(n_clusters=n_clusters)
+    clusterer = KmeansClusterer(n_clusters=2)
     error_calculator = SquaredErrorCalculator()
     filters = [ParetoFilter(), PercentileFilter(93)]
     projector = PCAProjector()
@@ -93,7 +92,7 @@ if __name__ == "__main__":
     filename = "mobo_iteration_{}.csv".format(n_iterations - 1)
     final_data = pd.read_csv(filename)
 
-    colors = ["blue", "orange", "green", "red", "purple", "brown", "pink"]
+    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"]
 
     # construct clusters plot
     fig, ax = plt.subplots()
