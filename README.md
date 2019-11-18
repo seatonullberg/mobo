@@ -16,6 +16,9 @@ For testing or development you will need to clone the repo.
 
 ```bash
 $ git clone https://github.com/seatonullberg/mobo.git
+$ cd mobo
+$ python3 -m pip install -r requirements.txt
+$ python3 -m pip install -e .
 ```
 
 ## Example
