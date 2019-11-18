@@ -36,7 +36,6 @@ class GlobalConfiguration(object):
     
     Args:
         n_samples: Number of samples to start with.
-        n_iterations: Number of iterations to complete.
         local_configurations: Configuration for each iteration.
         parameters: Parameter objects to fit.
         qois: QoI objects to evaluate.
@@ -45,17 +44,12 @@ class GlobalConfiguration(object):
     """
     def __init__(self,
                  n_samples: int,
-                 n_iterations: int, 
                  local_configurations: List[LocalConfiguration],
                  parameters: List[Parameter], 
                  qois: List[QoI], 
                  initial_data_path: Optional[str] = None,
                  logger: Optional[Logger] = None) -> None:
         self.n_samples = n_samples
-        if len(local_configurations) != n_iterations:
-            err = "Each iteration requires a LocalConfiguration."
-            raise ValueError(err)
-        self.n_iterations = n_iterations
         self.local_configurations = local_configurations
         self.parameters = parameters
         self.qois = qois

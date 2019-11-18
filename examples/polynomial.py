@@ -42,7 +42,7 @@ if __name__ == "__main__":
         Parameter("b", -2.0, 0.0),
         Parameter("c", 0.0, 1.0)
     ]
-    
+
     # construct qois
     qois = [
         QoI("pt0", evaluate_pt0, -0.062),
@@ -50,33 +50,33 @@ if __name__ == "__main__":
         QoI("pt2", evaluate_pt2, -1.4),
         QoI("pt3", evaluate_pt3, 2.0)
     ]
-    
-    # global settings
-    n_iterations = 5
-    n_samples = 15000
-    
+
+    n_iterations = 6  # number of iterations to evolve through
+    n_samples = 10000 # number of samples to draw at each iteration (could set different for each)
+    n_clusters = 2    # number of clusters to find at each iteration (could be set different for each)
+
     # construct local configurations
-    clusterer = KmeansClusterer(n_clusters=2)
+    clusterer = KmeansClusterer(n_clusters=n_clusters)
     error_calculator = SquaredErrorCalculator()
-    filters = [ParetoFilter(), PercentileFilter()]
+    filters = [ParetoFilter(), PercentileFilter(93)]
     projector = PCAProjector()
     local_config = LocalConfiguration(
         n_samples, clusterer, error_calculator, filters, projector
     )
     local_configurations = [local_config for _ in range(n_iterations)]
-    
+
     # construct global configuration
     global_config = GlobalConfiguration(
-        n_samples, n_iterations, local_configurations, parameters, qois
+        n_samples, local_configurations, parameters, qois
     )
-    
+
     ##################
     #  OPTIMIZATION  #
     ##################
 
     # construct optimizer
     optimizer = Optimizer(global_config)
-    
+
     # optimize
     optimizer()
 
@@ -88,18 +88,19 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
-    
-    # load final data file
-    final_data = pd.read_csv("mobo_iteration_4.csv")
 
-    colors = ["blue", "red"]
+    # load final data file
+    filename = "mobo_iteration_{}.csv".format(n_iterations - 1)
+    final_data = pd.read_csv(filename)
+
+    colors = ["blue", "orange", "green", "red", "purple", "brown", "pink"]
 
     # construct clusters plot
     fig, ax = plt.subplots()
-    for i, p in final_data[optimizer.projection_names].iterrows():
+    for i, p in final_data[optimizer.projection_headers].iterrows():
         x = p[0]
         y = p[1]
-        cluster_id = final_data["cluster_id"][i]
+        cluster_id = final_data[optimizer.cluster_header][i]
         ax.scatter(x, y, color=colors[cluster_id], s=2)
     ax.set_title("Clusters in Projected Parameter Space")
     ax.set_xlabel("PCA 0")
@@ -110,9 +111,9 @@ if __name__ == "__main__":
     # construct predictions plot
     fig, ax = plt.subplots()
     x = np.arange(-1.25, 4.25, 0.1)
-    for i, p in final_data[optimizer.parameter_names].iterrows():
+    for i, p in final_data[optimizer.parameter_headers].iterrows():
         y = [polynomial(p["a"], p["b"], p["c"], _x) for _x in x]
-        cluster_id = final_data["cluster_id"][i]
+        cluster_id = final_data[optimizer.cluster_header][i]
         ax.plot(x, y, alpha=0.2, color=colors[cluster_id], zorder=0)
     exact_y = [polynomial(0.3, -1.2, 0.5, _x) for _x in x]
     ax.plot(x, exact_y, color="black", zorder=1)
